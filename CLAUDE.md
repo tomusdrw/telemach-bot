@@ -97,6 +97,7 @@ PENDING_APPROVAL ─ admin rejects ───► REJECTED        (terminal)
 - Web admin UI
 - Per-user provider/model preferences
 - I18n
-- Persistent media-group buffer (in-memory only; a crash mid-buffer loses those messages)
+<!-- Persistent media-group buffer was added; see src/bot/forward.ts replayPending() -->
+- Persistent media-group buffer was an open item, now implemented: every group item is written to `media_group_pending` on receipt and replayed on startup.
 
 If a task touches one of these, check the spec — it might explicitly be out of scope.

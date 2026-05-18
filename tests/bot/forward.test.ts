@@ -189,4 +189,119 @@ describe('forward handler', () => {
       expect(emojis).toEqual(['👀', '✍', '💩']);
     }
   });
+
+  // -------- persistence + replay ------------------------------------------
+
+  it('media group: each item is persisted to media_group_pending on receipt', async () => {
+    const { deps, repo } = makeDeps();
+    const handler = makeForwardHandler(deps as any);
+    const ctxs = [
+      buildFakeCtx({
+        media_group_id: 'gp1',
+        photo: [{ file_id: 'p1', file_unique_id: '1', width: 800, height: 800 }] as any,
+      }),
+      buildFakeCtx({
+        media_group_id: 'gp1',
+        photo: [{ file_id: 'p2', file_unique_id: '2', width: 800, height: 800 }] as any,
+      }),
+    ];
+    for (const c of ctxs) await handler(c as any);
+
+    // Right after add (before flush), both rows should be in the table.
+    const pending = repo.listAllPendingMediaGroups();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.groupId).toBe('gp1');
+    expect(pending[0]!.items).toHaveLength(2);
+    expect(pending[0]!.items[0]!.messageId).toBe(ctxs[0]!.message.message_id);
+  });
+
+  it('media group flush deletes the persisted rows after sending', async () => {
+    const { deps, repo } = makeDeps();
+    const handler = makeForwardHandler(deps as any);
+    const ctxs = [
+      buildFakeCtx({
+        media_group_id: 'gp2',
+        photo: [{ file_id: 'p1', file_unique_id: '1', width: 800, height: 800 }] as any,
+      }),
+      buildFakeCtx({
+        media_group_id: 'gp2',
+        photo: [{ file_id: 'p2', file_unique_id: '2', width: 800, height: 800 }] as any,
+      }),
+    ];
+    for (const c of ctxs) await handler(c as any);
+
+    await vi.waitFor(() => expect(deps.resend.send).toHaveBeenCalled());
+    expect(repo.listAllPendingMediaGroups()).toHaveLength(0);
+  });
+
+  it('replayPending: groups in DB at startup are processed with api-based reactions', async () => {
+    const setMessageReaction = vi.fn().mockResolvedValue(true);
+    const { deps, repo } = makeDeps({ api: { setMessageReaction } });
+    // Seed two persisted items from a previous run
+    const payload = JSON.stringify({
+      kind: { fileId: 'p1', filenameHint: 'photo.jpg', isVoice: false, text: 'cap' },
+      user: { email: 'alice@x.com', username: 'alice', firstName: 'Alice', telegramId: 7 },
+    });
+    repo.addMediaGroupItem({
+      groupId: 'oldgrp',
+      telegramId: 7,
+      chatId: 7,
+      messageId: 100,
+      payloadJson: payload,
+    });
+    repo.addMediaGroupItem({
+      groupId: 'oldgrp',
+      telegramId: 7,
+      chatId: 7,
+      messageId: 101,
+      payloadJson: payload,
+    });
+
+    const handler = makeForwardHandler(deps as any);
+    await handler.replayPending();
+
+    // Email sent once, both rows deleted, api.setMessageReaction called for both items
+    expect(deps.resend.send).toHaveBeenCalledTimes(1);
+    expect(repo.listAllPendingMediaGroups()).toHaveLength(0);
+    // Each item: ✍ (working) + 👍 (done). Total of 4 reaction calls.
+    const calls = setMessageReaction.mock.calls;
+    expect(calls.length).toBe(4);
+    expect(calls.map((c) => c[2]?.[0]?.emoji)).toEqual(['✍', '✍', '👍', '👍']);
+  });
+
+  it('replayPending: drops a row with corrupt payload_json and processes the rest', async () => {
+    const setMessageReaction = vi.fn().mockResolvedValue(true);
+    const { deps, repo } = makeDeps({ api: { setMessageReaction } });
+    const goodPayload = JSON.stringify({
+      kind: { fileId: 'p1', filenameHint: 'photo.jpg', isVoice: false, text: '' },
+      user: { email: 'alice@x.com', username: 'alice', firstName: 'Alice', telegramId: 7 },
+    });
+    repo.addMediaGroupItem({
+      groupId: 'mix',
+      telegramId: 7,
+      chatId: 7,
+      messageId: 200,
+      payloadJson: '{not json',
+    });
+    repo.addMediaGroupItem({
+      groupId: 'mix',
+      telegramId: 7,
+      chatId: 7,
+      messageId: 201,
+      payloadJson: goodPayload,
+    });
+
+    const handler = makeForwardHandler(deps as any);
+    await handler.replayPending();
+
+    expect(deps.resend.send).toHaveBeenCalledTimes(1);
+    expect(repo.listAllPendingMediaGroups()).toHaveLength(0);
+  });
+
+  it('replayPending: no-op when nothing is pending', async () => {
+    const { deps } = makeDeps();
+    const handler = makeForwardHandler(deps as any);
+    await handler.replayPending();
+    expect(deps.resend.send).not.toHaveBeenCalled();
+  });
 });
