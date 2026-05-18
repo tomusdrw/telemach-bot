@@ -4,10 +4,11 @@ import { buildBot } from './bot/index';
 import { parseConfig } from './config';
 import { openDatabase } from './db/index';
 import { UserRepo } from './db/users';
-import { logger } from './lib/logger';
+import { configureLogger, logger } from './lib/logger';
 
 async function main(): Promise<void> {
   const config = parseConfig(process.env as Record<string, string | undefined>);
+  configureLogger({ level: config.logLevel });
   const db = openDatabase(config.dbPath);
   const repo = new UserRepo(db);
   repo.seedAdmin({ telegramId: config.adminTelegramUserId, email: config.adminEmail });
