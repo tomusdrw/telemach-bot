@@ -7,10 +7,7 @@ export interface UserView {
   isAdmin: boolean;
 }
 
-export type Input =
-  | { kind: 'start' }
-  | { kind: 'register'; email: string }
-  | { kind: 'message' };
+export type Input = { kind: 'start' } | { kind: 'register'; email: string } | { kind: 'message' };
 
 export type Action =
   | { type: 'create-and-greet' }

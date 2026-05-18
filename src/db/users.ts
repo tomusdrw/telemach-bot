@@ -70,7 +70,7 @@ export class UserRepo {
          ON CONFLICT(telegram_id) DO UPDATE SET
            username = excluded.username,
            first_name = excluded.first_name,
-           updated_at = excluded.updated_at`
+           updated_at = excluded.updated_at`,
       )
       .run(input.telegramId, input.username, input.firstName, t, t);
   }
@@ -81,7 +81,7 @@ export class UserRepo {
       .prepare(
         `UPDATE users
          SET email = ?, status = 'PENDING_APPROVAL', updated_at = ?
-         WHERE telegram_id = ?`
+         WHERE telegram_id = ?`,
       )
       .run(email, t, telegramId);
   }
@@ -99,7 +99,7 @@ export class UserRepo {
       .prepare(
         `INSERT INTO users (telegram_id, username, first_name, email, status, is_admin, created_at, updated_at)
          VALUES (?, NULL, NULL, ?, 'APPROVED', 1, ?, ?)
-         ON CONFLICT(telegram_id) DO NOTHING`
+         ON CONFLICT(telegram_id) DO NOTHING`,
       )
       .run(input.telegramId, input.email, t, t);
   }
@@ -108,7 +108,7 @@ export class UserRepo {
     this.db
       .prepare(
         `INSERT INTO audit_log (telegram_id, chat_message_id, event, details, created_at)
-         VALUES (?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?)`,
       )
       .run(input.telegramId, input.chatMessageId, input.event, input.details, now());
   }

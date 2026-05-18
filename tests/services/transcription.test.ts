@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { makeTranscriptionClient } from '../../src/services/transcription';
+import { describe, expect, it, vi } from 'vitest';
 import { FatalError, TransientError } from '../../src/lib/errors';
+import { makeTranscriptionClient } from '../../src/services/transcription';
 
 function mockFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({
@@ -26,10 +26,10 @@ describe('transcription service', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer k',
+          Authorization: 'Bearer k',
           'Content-Type': 'application/json',
         }),
-      })
+      }),
     );
   });
 
@@ -54,48 +54,48 @@ describe('transcription service', () => {
   it('throws FatalError on empty transcript', async () => {
     const fetchImpl = mockFetch(200, { text: '   ' });
     const c = makeTranscriptionClient({ apiKey: 'k', model: 'm', fetchImpl });
-    await expect(
-      c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })
-    ).rejects.toBeInstanceOf(FatalError);
+    await expect(c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })).rejects.toBeInstanceOf(
+      FatalError,
+    );
   });
 
   it('maps 5xx to TransientError', async () => {
     const fetchImpl = mockFetch(503, { error: 'boom' });
     const c = makeTranscriptionClient({ apiKey: 'k', model: 'm', fetchImpl });
-    await expect(
-      c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })
-    ).rejects.toBeInstanceOf(TransientError);
+    await expect(c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })).rejects.toBeInstanceOf(
+      TransientError,
+    );
   });
 
   it('maps 429 to TransientError', async () => {
     const fetchImpl = mockFetch(429, { error: 'rate' });
     const c = makeTranscriptionClient({ apiKey: 'k', model: 'm', fetchImpl });
-    await expect(
-      c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })
-    ).rejects.toBeInstanceOf(TransientError);
+    await expect(c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })).rejects.toBeInstanceOf(
+      TransientError,
+    );
   });
 
   it('maps 4xx (non-429) to FatalError', async () => {
     const fetchImpl = mockFetch(400, { error: 'bad audio' });
     const c = makeTranscriptionClient({ apiKey: 'k', model: 'm', fetchImpl });
-    await expect(
-      c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })
-    ).rejects.toBeInstanceOf(FatalError);
+    await expect(c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })).rejects.toBeInstanceOf(
+      FatalError,
+    );
   });
 
   it('maps fetch rejection to TransientError', async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('ENETUNREACH'));
     const c = makeTranscriptionClient({ apiKey: 'k', model: 'm', fetchImpl });
-    await expect(
-      c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })
-    ).rejects.toBeInstanceOf(TransientError);
+    await expect(c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })).rejects.toBeInstanceOf(
+      TransientError,
+    );
   });
 
   it('maps unexpected response shape to FatalError', async () => {
     const fetchImpl = mockFetch(200, { not_what_we_expect: true });
     const c = makeTranscriptionClient({ apiKey: 'k', model: 'm', fetchImpl });
-    await expect(
-      c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })
-    ).rejects.toBeInstanceOf(FatalError);
+    await expect(c.transcribe({ audio: Buffer.from('a'), filename: 'voice.ogg' })).rejects.toBeInstanceOf(
+      FatalError,
+    );
   });
 });

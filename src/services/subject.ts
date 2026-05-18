@@ -1,19 +1,21 @@
 import { z } from 'zod';
-import { logger } from '../lib/logger';
 import { buildSubjectPrompt } from '../bot/subject-prompt';
+import { logger } from '../lib/logger';
 
 export interface SubjectClient {
   generateSubject(body: string): Promise<string | null>;
 }
 
 const responseSchema = z.object({
-  choices: z.array(
-    z.object({
-      message: z.object({
-        content: z.string(),
+  choices: z
+    .array(
+      z.object({
+        message: z.object({
+          content: z.string(),
+        }),
       }),
-    })
-  ).min(1),
+    )
+    .min(1),
 });
 
 export interface SubjectClientOptions {
@@ -30,14 +32,12 @@ export function makeSubjectClient(opts: SubjectClientOptions): SubjectClient {
         const res = await fetchImpl('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${opts.apiKey}`,
+            Authorization: `Bearer ${opts.apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             model: opts.model,
-            messages: [
-              { role: 'user', content: buildSubjectPrompt(body) },
-            ],
+            messages: [{ role: 'user', content: buildSubjectPrompt(body) }],
             max_tokens: 60,
             temperature: 0.3,
           }),

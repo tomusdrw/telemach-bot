@@ -39,7 +39,7 @@ export function makeTranscriptionClient(opts: TranscriptionClientOptions): Trans
         res = await fetchImpl('https://openrouter.ai/api/v1/audio/transcriptions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${opts.apiKey}`,
+            Authorization: `Bearer ${opts.apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -61,11 +61,14 @@ export function makeTranscriptionClient(opts: TranscriptionClientOptions): Trans
           });
         }
         let bodyText = '';
-        try { bodyText = await res.text(); } catch { /* ignore */ }
-        throw new FatalError(
-          `openrouter transcription ${res.status}: ${bodyText.slice(0, 200)}`,
-          { provider: 'openrouter' }
-        );
+        try {
+          bodyText = await res.text();
+        } catch {
+          /* ignore */
+        }
+        throw new FatalError(`openrouter transcription ${res.status}: ${bodyText.slice(0, 200)}`, {
+          provider: 'openrouter',
+        });
       }
 
       let json: unknown;

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { makeSubjectClient } from '../../src/services/subject';
 
 function mockFetch(body: any, status = 200) {
@@ -27,10 +27,10 @@ describe('subject service', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer k',
+          Authorization: 'Bearer k',
           'Content-Type': 'application/json',
         }),
-      })
+      }),
     );
   });
 

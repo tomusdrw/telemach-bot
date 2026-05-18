@@ -1,7 +1,8 @@
 // src/db/index.ts
-import Database from 'better-sqlite3';
+
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
+import Database from 'better-sqlite3';
 
 export type DB = Database.Database;
 

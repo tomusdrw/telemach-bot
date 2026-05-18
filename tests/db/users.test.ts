@@ -1,8 +1,8 @@
 // tests/db/users.test.ts
-import { describe, it, expect, beforeEach } from 'vitest';
-import { makeTempDb } from '../helpers/temp-db';
-import { UserRepo, type UserStatus } from '../../src/db/users';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { DB } from '../../src/db/index';
+import { UserRepo, type UserStatus } from '../../src/db/users';
+import { makeTempDb } from '../helpers/temp-db';
 
 describe('UserRepo', () => {
   let db: DB;

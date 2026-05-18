@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MediaGroupBuffer } from '../../src/bot/media-group';
 
 describe('MediaGroupBuffer', () => {
@@ -33,9 +33,7 @@ describe('MediaGroupBuffer', () => {
     vi.advanceTimersByTime(50);
     await Promise.resolve();
     expect(onFlush).toHaveBeenCalledTimes(1);
-    expect(onFlush).toHaveBeenCalledWith('g1', [
-      { id: 1 }, { id: 2 }, { id: 3 },
-    ]);
+    expect(onFlush).toHaveBeenCalledWith('g1', [{ id: 1 }, { id: 2 }, { id: 3 }]);
   });
 
   it('keeps groups independent', async () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { TransientError, FatalError, withRetry } from '../../src/lib/errors';
+import { describe, expect, it, vi } from 'vitest';
+import { FatalError, TransientError, withRetry } from '../../src/lib/errors';
 
 describe('errors', () => {
   it('TransientError and FatalError are distinct named classes', () => {
@@ -21,7 +21,8 @@ describe('errors', () => {
   });
 
   it('withRetry retries TransientError up to delays.length+1 times', async () => {
-    const fn = vi.fn()
+    const fn = vi
+      .fn()
       .mockRejectedValueOnce(new TransientError('1', { provider: 'openrouter' }))
       .mockRejectedValueOnce(new TransientError('2', { provider: 'openrouter' }))
       .mockResolvedValue('ok');

@@ -1,6 +1,6 @@
 // tests/bot/onboarding.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleStart, handleRegister, handlePlainMessage } from '../../src/bot/onboarding';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { handlePlainMessage, handleRegister, handleStart } from '../../src/bot/onboarding';
 import { UserRepo } from '../../src/db/users';
 import { makeTempDb } from '../helpers/temp-db';
 
@@ -25,9 +25,7 @@ describe('onboarding handlers', () => {
     const ctx = makeCtx();
     await handleStart(ctx as any, { repo, notify });
     expect(repo.findById(7)?.status).toBe('PENDING_EMAIL');
-    expect(ctx.reply).toHaveBeenCalledWith(
-      expect.stringMatching(/\/register your@email\.com/i)
-    );
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/\/register your@email\.com/i));
   });
 
   it('/start on approved user replies "already set up"', async () => {
@@ -45,9 +43,13 @@ describe('onboarding handlers', () => {
     expect(repo.findById(7)?.email).toBe('me@example.com');
     expect(repo.findById(7)?.status).toBe('PENDING_APPROVAL');
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
-      telegramId: 7, username: 'u', email: 'me@example.com',
-    }));
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telegramId: 7,
+        username: 'u',
+        email: 'me@example.com',
+      }),
+    );
     expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/waiting for admin/i));
   });
 

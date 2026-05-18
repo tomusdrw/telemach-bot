@@ -61,11 +61,15 @@ Service wrappers map provider errors to one of these. The forward handler wraps 
 
 ```bash
 npm install
-npm test           # 85 unit tests, all mocked at SDK boundaries
+npm test           # 102 unit tests, all mocked at SDK boundaries
 npm run typecheck
+npm run lint       # biome check, fails on warnings
+npm run lint:fix   # auto-fix lint + format issues
 npm run build      # tsc + cp schema.sql to dist/db/
 npm run dev        # tsx watch
 ```
+
+**Style is enforced by Biome** (`biome.json`). Auto-formats on `lint:fix`. CI fails on warnings, so don't merge a PR with new ones.
 
 Real provider tests are **not in CI**. The first deploy is the first integration test — the spec acknowledged this.
 

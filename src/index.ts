@@ -1,9 +1,9 @@
 // src/index.ts
 import 'dotenv/config';
+import { buildBot } from './bot/index';
 import { parseConfig } from './config';
 import { openDatabase } from './db/index';
 import { UserRepo } from './db/users';
-import { buildBot } from './bot/index';
 import { logger } from './lib/logger';
 
 async function main(): Promise<void> {
