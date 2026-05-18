@@ -5,7 +5,7 @@ import { UserRepo } from '../db/users';
 import { handleStart, handleRegister, handlePlainMessage } from './onboarding';
 import { makeAdminModule } from './admin';
 import { makeForwardHandler } from './forward';
-import { makeWhisperClient, defaultOpenAIClient } from '../services/whisper';
+import { makeTranscriptionClient } from '../services/transcription';
 import { makeSubjectClient } from '../services/subject';
 import { makeResendClient, defaultResendClient } from '../services/resend';
 import { downloadTelegramFile } from '../services/telegram-files';
@@ -14,7 +14,10 @@ import { logger } from '../lib/logger';
 export function buildBot(config: Config, repo: UserRepo): Bot {
   const bot = new Bot(config.telegramBotToken);
 
-  const whisper = makeWhisperClient(defaultOpenAIClient(config.openaiApiKey));
+  const transcription = makeTranscriptionClient({
+    apiKey: config.openrouterApiKey,
+    model: config.openrouterTranscriptionModel,
+  });
   const subject = makeSubjectClient({
     apiKey: config.openrouterApiKey,
     model: config.openrouterModel,
@@ -33,7 +36,7 @@ export function buildBot(config: Config, repo: UserRepo): Bot {
     botToken: config.telegramBotToken,
     api: bot.api,
     subject,
-    whisper,
+    transcription,
     resend,
     download: ({ api, botToken, fileId }) => downloadTelegramFile({ api, botToken, fileId }),
     mediaGroupFlushMs: config.mediaGroupFlushMs,

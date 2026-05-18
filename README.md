@@ -16,8 +16,8 @@ full design.
    - `TELEGRAM_BOT_TOKEN` from @BotFather
    - `ADMIN_TELEGRAM_USER_ID` (your numeric Telegram user id, ask @userinfobot)
    - `ADMIN_EMAIL`
-   - `OPENAI_API_KEY` (for Whisper)
-   - `OPENROUTER_API_KEY`
+   - `OPENROUTER_API_KEY` (used for both transcription and subject generation)
+   - Optionally override `OPENROUTER_MODEL` (subjects) and `OPENROUTER_TRANSCRIPTION_MODEL` (voice → text)
    - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (must be a verified Resend domain)
 2. Create the data directory with the right ownership. The container runs as the
    `node` user (UID 1000); the bind-mount preserves host UID, so:
@@ -61,8 +61,10 @@ npm run dev
 - `/register` → bot stores email, DMs admin with Approve/Reject buttons.
 - After approval, forwarded messages are acknowledged with reactions only:
   👀 received → ✍ working → 👍 sent (or 💩 on error).
-- Voice messages are transcribed by OpenAI Whisper; the transcript is sent as
-  the email body. Original audio is not attached.
+- Voice messages are transcribed via OpenRouter's `/audio/transcriptions`
+  endpoint (default model: `openai/whisper-large-v3`, override with
+  `OPENROUTER_TRANSCRIPTION_MODEL`). The transcript is sent as the email
+  body; original audio is not attached.
 - Photos/documents/videos/audio/animations/stickers are attached verbatim.
 - Multiple photos uploaded together bundle into one email.
 

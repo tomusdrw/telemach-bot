@@ -2,7 +2,9 @@
   "name": "telemach-bot",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && mkdir -p dist/db && cp src/db/schema.sql dist/db/schema.sql",
     "start": "node dist/index.js",
@@ -15,7 +17,6 @@
     "better-sqlite3": "^12.10.0",
     "dotenv": "^16.4.5",
     "grammy": "^1.30.0",
-    "openai": "^4.68.0",
     "pino": "^9.4.0",
     "resend": "^3.5.0",
     "zod": "^3.23.8"
