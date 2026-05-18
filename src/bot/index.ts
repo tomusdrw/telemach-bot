@@ -54,6 +54,10 @@ export function buildBot(config: Config, repo: UserRepo): Bot {
     });
   });
 
+  bot.command('users', (ctx) => admin.handleUsersCommand(ctx));
+  bot.command('revoke', (ctx) => admin.handleRevokeCommand(ctx, String(ctx.match).trim()));
+  bot.command('reset', (ctx) => admin.handleResetCommand(ctx, String(ctx.match).trim()));
+
   bot.callbackQuery(/^(approve|reject):\d+$/, (ctx) => admin.handleCallback(ctx));
 
   bot.on('message', async (ctx: Context) => {

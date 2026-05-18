@@ -68,6 +68,14 @@ npm run dev
 - Photos/documents/videos/audio/animations/stickers are attached verbatim.
 - Multiple photos uploaded together bundle into one email.
 
+## Admin commands
+
+These work only when invoked by the configured `ADMIN_TELEGRAM_USER_ID`:
+
+- `/users` — list up to 50 most-recent users with status and email.
+- `/revoke <telegramId>` — flip an `APPROVED` user to `REJECTED`. Refuses to act on the admin.
+- `/reset <telegramId>` — clear the user's email and return them to `PENDING_EMAIL` so they can re-register.
+
 ## Troubleshooting
 
 - **💩 reaction on every message.** Check the container logs (`docker compose

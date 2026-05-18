@@ -93,6 +93,22 @@ export class UserRepo {
       .run(status, t, telegramId);
   }
 
+  listUsers(opts: { limit: number } = { limit: 50 }): User[] {
+    const rows = this.db
+      .prepare<[number], UserRow>(`SELECT * FROM users ORDER BY created_at DESC LIMIT ?`)
+      .all(opts.limit);
+    return rows.map(rowToUser);
+  }
+
+  resetUser(telegramId: number): void {
+    const t = now();
+    this.db
+      .prepare(
+        `UPDATE users SET email = NULL, status = 'PENDING_EMAIL', updated_at = ? WHERE telegram_id = ?`,
+      )
+      .run(t, telegramId);
+  }
+
   seedAdmin(input: { telegramId: number; email: string }): void {
     const t = now();
     this.db
