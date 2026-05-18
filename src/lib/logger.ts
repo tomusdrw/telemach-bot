@@ -1,10 +1,13 @@
 // src/lib/logger.ts
 import pino from 'pino';
 
-const level = process.env.LOG_LEVEL ?? 'info';
+// Default level used until `configureLogger` is called (i.e. for any log lines
+// emitted before the validated config is available — typically only startup
+// errors, which are fatal anyway and always log).
+const DEFAULT_LEVEL = 'info';
 
 export const logger = pino({
-  level,
+  level: DEFAULT_LEVEL,
   base: { service: 'telemach-bot' },
   timestamp: pino.stdTimeFunctions.isoTime,
   redact: {
@@ -31,3 +34,12 @@ export const logger = pino({
 });
 
 export type Logger = typeof logger;
+
+/**
+ * Apply the validated log level from config. Call once at startup, right after
+ * `parseConfig` succeeds. `process.env.LOG_LEVEL` is no longer read directly by
+ * this module — config is the single source of truth.
+ */
+export function configureLogger(opts: { level: Logger['level'] }): void {
+  logger.level = opts.level;
+}
