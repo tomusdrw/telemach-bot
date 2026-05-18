@@ -41,7 +41,7 @@ describe('forward handler', () => {
     expect(deps.resend.send).toHaveBeenCalledTimes(1);
     const payload = deps.resend.send.mock.calls[0][0];
     expect(payload.to).toBe('alice@x.com');
-    expect(payload.subject).toBe('[TG] Lunch plans');
+    expect(payload.subject).toBe('Lunch plans');
     expect(payload.attachments).toEqual([]);
   });
 
@@ -100,7 +100,7 @@ describe('forward handler', () => {
     const ctx = buildFakeCtx({ text: 'hi' });
     await handler(ctx as any);
     const payload = deps.resend.send.mock.calls[0][0];
-    expect(payload.subject).toBe('[TG] Telegram message from @alice');
+    expect(payload.subject).toBe('Telegram message from @alice');
   });
 
   it('FatalError during whisper sets 💩, no email sent', async () => {

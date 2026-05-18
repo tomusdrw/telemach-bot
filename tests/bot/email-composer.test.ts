@@ -6,6 +6,8 @@ const base: ComposeInput = {
   fromEmail: 'bot@example.com',
   toEmail: 'me@example.com',
   username: 'alice',
+  firstName: 'Alice',
+  telegramId: 7,
   subject: 'Hello',
   body: 'plain text body',
   attachments: [],
@@ -13,12 +15,12 @@ const base: ComposeInput = {
 };
 
 describe('composeEmail', () => {
-  it('builds payload with [TG] prefix and attribution header', () => {
+  it('builds payload with attribution header and no subject prefix', () => {
     const p = composeEmail(base);
     expect(p.from).toBe('bot@example.com');
     expect(p.to).toBe('me@example.com');
-    expect(p.subject).toBe('[TG] Hello');
-    expect(p.text).toContain('Sent by @alice (Telegram) at 2026-01-02T03:04:05.000Z');
+    expect(p.subject).toBe('Hello');
+    expect(p.text).toContain('Sent by @alice (Telegram) at 2026-01-02 03:04:05 UTC');
     expect(p.text).toContain('plain text body');
     expect(p.html).toContain('Sent by @alice (Telegram)');
     expect(p.html).toContain('plain text body');
@@ -39,9 +41,23 @@ describe('composeEmail', () => {
     expect(p.html).toContain('(no text)');
   });
 
-  it('uses "unknown sender" when username is null', () => {
+  it('falls back to firstName when username is null', () => {
     const p = composeEmail({ ...base, username: null });
-    expect(p.text).toContain('Sent by unknown sender');
+    expect(p.text).toContain('Sent by Alice (Telegram)');
+    expect(p.text).not.toContain('unknown');
+  });
+
+  it('falls back to "user <telegramId>" when both username and firstName are null', () => {
+    const p = composeEmail({ ...base, username: null, firstName: null });
+    expect(p.text).toContain('Sent by user 7 (Telegram)');
+    expect(p.text).not.toContain('unknown');
+  });
+
+  it('formats sentAt as YYYY-MM-DD HH:mm:ss UTC (no milliseconds, no T)', () => {
+    const p = composeEmail({ ...base, sentAt: new Date('2026-05-18T18:05:41.377Z') });
+    expect(p.text).toContain('2026-05-18 18:05:41 UTC');
+    expect(p.text).not.toContain('.377');
+    expect(p.text).not.toContain('T18:05');
   });
 
   it('passes attachments through as-is', () => {

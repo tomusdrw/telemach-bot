@@ -8,6 +8,8 @@ export interface ComposeInput {
   fromEmail: string;
   toEmail: string;
   username: string | null;
+  firstName: string | null;
+  telegramId: number;
   subject: string;
   body: string;
   attachments: EmailAttachment[];
@@ -31,9 +33,19 @@ const escapeHtml = (s: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+function senderLabel(input: ComposeInput): string {
+  if (input.username) return `@${input.username}`;
+  if (input.firstName) return input.firstName;
+  return `user ${input.telegramId}`;
+}
+
+function formatUtc(d: Date): string {
+  // e.g. "2026-05-18 18:05:41 UTC"
+  return `${d.toISOString().slice(0, 19).replace('T', ' ')} UTC`;
+}
+
 export function composeEmail(input: ComposeInput): EmailPayload {
-  const senderLabel = input.username ? `@${input.username}` : 'unknown sender';
-  const attribution = `Sent by ${senderLabel} (Telegram) at ${input.sentAt.toISOString()}`;
+  const attribution = `Sent by ${senderLabel(input)} (Telegram) at ${formatUtc(input.sentAt)}`;
   const body = input.body.trim() === '' ? '(no text)' : input.body;
 
   const text = `${attribution}\n\n${body}\n`;
@@ -42,7 +54,7 @@ export function composeEmail(input: ComposeInput): EmailPayload {
   return {
     from: input.fromEmail,
     to: input.toEmail,
-    subject: `[TG] ${input.subject}`,
+    subject: input.subject,
     text,
     html,
     attachments: input.attachments,

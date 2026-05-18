@@ -72,7 +72,10 @@ function attachmentCountLabel(n: number): string {
   return n === 1 ? '(1 attachment)' : `(${n} attachments)`;
 }
 
-type ForwardItem = { ctx: Context; user: { email: string; username: string | null } };
+type ForwardItem = {
+  ctx: Context;
+  user: { email: string; username: string | null; firstName: string | null; telegramId: number };
+};
 
 export function makeForwardHandler(deps: ForwardDeps) {
   async function buildAndSend(items: ForwardItem[]): Promise<void> {
@@ -123,6 +126,8 @@ export function makeForwardHandler(deps: ForwardDeps) {
       fromEmail: deps.fromEmail,
       toEmail: first.user.email,
       username: first.user.username,
+      firstName: first.user.firstName,
+      telegramId: first.user.telegramId,
       subject,
       body,
       attachments,
@@ -166,7 +171,15 @@ export function makeForwardHandler(deps: ForwardDeps) {
 
     await markReceived(ctx);
 
-    const item: ForwardItem = { ctx, user: { email: user.email, username: user.username } };
+    const item: ForwardItem = {
+      ctx,
+      user: {
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        telegramId: user.telegramId,
+      },
+    };
 
     if (msg.media_group_id) {
       buffer.add(msg.media_group_id, item);
