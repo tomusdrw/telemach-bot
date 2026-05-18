@@ -17,7 +17,7 @@ describe('parseConfig', () => {
     expect(cfg.telegramBotToken).toBe('token');
     expect(cfg.adminTelegramUserId).toBe(12345);
     expect(cfg.adminEmail).toBe('admin@example.com');
-    expect(cfg.openrouterModel).toBe('openai/gpt-4o-mini');
+    expect(cfg.openrouterModel).toBe('google/gemma-3-4b-it');
     expect(cfg.dbPath).toBe('./data/bot.db');
     expect(cfg.mediaGroupFlushMs).toBe(2000);
     expect(cfg.logLevel).toBe('info');

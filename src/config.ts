@@ -8,7 +8,7 @@ const schema = z.object({
   OPENAI_API_KEY: z.string().min(1),
 
   OPENROUTER_API_KEY: z.string().min(1),
-  OPENROUTER_MODEL: z.string().default('openai/gpt-4o-mini'),
+  OPENROUTER_MODEL: z.string().default('google/gemma-3-4b-it'),
 
   RESEND_API_KEY: z.string().min(1),
   RESEND_FROM_EMAIL: z.string().email(),
