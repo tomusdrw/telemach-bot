@@ -62,47 +62,62 @@ function classify(msg: Message): MsgKind {
     return { fileId: msg.animation.file_id, filenameHint: msg.animation.file_name ?? 'animation.mp4', isVoice: false, text: msg.caption ?? '' };
   }
   if (msg.sticker) {
-    return { fileId: msg.sticker.file_id, filenameHint: msg.sticker.is_animated ? 'sticker.tgs' : 'sticker.webp', isVoice: false, text: '' };
+    const ext = msg.sticker.is_video ? 'webm' : msg.sticker.is_animated ? 'tgs' : 'webp';
+    return { fileId: msg.sticker.file_id, filenameHint: `sticker.${ext}`, isVoice: false, text: '' };
   }
   return { fileId: null, filenameHint: null, isVoice: false, text: msg.text ?? msg.caption ?? '' };
 }
 
-export function makeForwardHandler(deps: ForwardDeps) {
-  type Pending = { ctx: Context; user: { email: string; username: string | null } };
-  const buffer = new MediaGroupBuffer<Pending>(deps.mediaGroupFlushMs, async (groupId, items) => {
-    try {
-      await processGroup(items);
-    } catch (err) {
-      logger.error({ err, groupId }, 'media-group flush failed');
-      for (const it of items) await markFailed(it.ctx as any);
-    }
-  });
+function attachmentCountLabel(n: number): string {
+  return n === 1 ? '(1 attachment)' : `(${n} attachments)`;
+}
 
-  async function processGroup(items: Pending[]): Promise<void> {
+type ForwardItem = { ctx: Context; user: { email: string; username: string | null } };
+
+export function makeForwardHandler(deps: ForwardDeps) {
+  async function buildAndSend(items: ForwardItem[]): Promise<void> {
     if (items.length === 0) return;
     const first = items[0]!;
-    for (const it of items) await markWorking(it.ctx as any);
 
     const attachments: EmailAttachment[] = [];
     const captions: string[] = [];
+    let transcribedBody: string | null = null;
+
     for (const it of items) {
       const msg = it.ctx.message;
       if (!msg) continue;
       const kind = classify(msg);
-      if (kind.fileId) {
-        const dl = await withRetry(
-          () => deps.download({ api: deps.api, botToken: deps.botToken, fileId: kind.fileId! }),
+      if (!kind.fileId) {
+        if (kind.text) captions.push(kind.text);
+        continue;
+      }
+      const dl = await withRetry(
+        () => deps.download({ api: deps.api, botToken: deps.botToken, fileId: kind.fileId! }),
+        { delaysMs: deps.retryDelays }
+      );
+      if (kind.isVoice) {
+        transcribedBody = await withRetry(
+          () => deps.whisper.transcribe({ audio: dl.buffer, filename: dl.filename }),
           { delaysMs: deps.retryDelays }
         );
+        deps.repo.logAudit({
+          telegramId: it.ctx.from?.id ?? 0,
+          chatMessageId: msg.message_id,
+          event: 'transcribed',
+          details: null,
+        });
+      } else {
         attachments.push({ filename: kind.filenameHint ?? dl.filename, content: dl.buffer });
       }
       if (kind.text) captions.push(kind.text);
     }
-    const body = captions.join('\n\n');
-    const subjectInput = body || `(${attachments.length} attachments)`;
+
+    const body = transcribedBody ?? captions.join('\n\n');
+    const subjectInput = body || (attachments.length > 0 ? attachmentCountLabel(attachments.length) : '(no text)');
     const rawSubject = await deps.subject.generateSubject(subjectInput);
-    const subject = rawSubject ? (sanitizeSubject(rawSubject) || fallbackSubject(first.user.username))
-                               : fallbackSubject(first.user.username);
+    const subject = rawSubject
+      ? (sanitizeSubject(rawSubject) || fallbackSubject(first.user.username))
+      : fallbackSubject(first.user.username);
 
     const payload = composeEmail({
       fromEmail: deps.fromEmail,
@@ -115,14 +130,26 @@ export function makeForwardHandler(deps: ForwardDeps) {
     });
     await withRetry(() => deps.resend.send(payload), { delaysMs: deps.retryDelays });
 
-    for (const it of items) await markDone(it.ctx as any);
     deps.repo.logAudit({
       telegramId: first.ctx.from?.id ?? 0,
       chatMessageId: first.ctx.message?.message_id ?? null,
       event: 'emailed',
-      details: JSON.stringify({ group: items.length, attachments: attachments.length }),
+      details: items.length > 1
+        ? JSON.stringify({ group: items.length, attachments: attachments.length })
+        : null,
     });
   }
+
+  const buffer = new MediaGroupBuffer<ForwardItem>(deps.mediaGroupFlushMs, async (groupId, items) => {
+    try {
+      for (const it of items) await markWorking(it.ctx);
+      await buildAndSend(items);
+      for (const it of items) await markDone(it.ctx);
+    } catch (err) {
+      logger.error({ err, groupId }, 'media-group flush failed');
+      for (const it of items) await markFailed(it.ctx);
+    }
+  });
 
   return async function handle(ctx: Context): Promise<void> {
     const msg = ctx.message;
@@ -137,70 +164,24 @@ export function makeForwardHandler(deps: ForwardDeps) {
       details: null,
     });
 
-    await markReceived(ctx as any);
+    await markReceived(ctx);
+
+    const item: ForwardItem = { ctx, user: { email: user.email, username: user.username } };
 
     if (msg.media_group_id) {
-      buffer.add(msg.media_group_id, { ctx, user: { email: user.email, username: user.username } });
+      buffer.add(msg.media_group_id, item);
       return;
     }
 
     try {
-      await markWorking(ctx as any);
-      const kind = classify(msg);
-
-      const attachments: EmailAttachment[] = [];
-      let body = kind.text;
-
-      if (kind.fileId && !kind.isVoice) {
-        const dl = await withRetry(
-          () => deps.download({ api: deps.api, botToken: deps.botToken, fileId: kind.fileId! }),
-          { delaysMs: deps.retryDelays }
-        );
-        attachments.push({ filename: kind.filenameHint ?? dl.filename, content: dl.buffer });
-      } else if (kind.fileId && kind.isVoice) {
-        const dl = await withRetry(
-          () => deps.download({ api: deps.api, botToken: deps.botToken, fileId: kind.fileId! }),
-          { delaysMs: deps.retryDelays }
-        );
-        body = await withRetry(
-          () => deps.whisper.transcribe({ audio: dl.buffer, filename: dl.filename }),
-          { delaysMs: deps.retryDelays }
-        );
-        deps.repo.logAudit({
-          telegramId: ctx.from.id,
-          chatMessageId: msg.message_id,
-          event: 'transcribed',
-          details: null,
-        });
-      }
-
-      const subjectInput = body || (attachments.length > 0 ? `(${attachments.length} attachment)` : '(no text)');
-      const rawSubject = await deps.subject.generateSubject(subjectInput);
-      const subject = rawSubject ? (sanitizeSubject(rawSubject) || fallbackSubject(user.username))
-                                 : fallbackSubject(user.username);
-
-      const payload = composeEmail({
-        fromEmail: deps.fromEmail,
-        toEmail: user.email,
-        username: user.username,
-        subject,
-        body,
-        attachments,
-        sentAt: new Date(),
-      });
-      await withRetry(() => deps.resend.send(payload), { delaysMs: deps.retryDelays });
-      await markDone(ctx as any);
-      deps.repo.logAudit({
-        telegramId: ctx.from.id,
-        chatMessageId: msg.message_id,
-        event: 'emailed',
-        details: null,
-      });
+      await markWorking(ctx);
+      await buildAndSend([item]);
+      await markDone(ctx);
     } catch (err) {
       const cls = err instanceof TransientError ? 'TransientError'
                 : err instanceof FatalError ? 'FatalError' : 'Unknown';
       logger.error({ err, cls, msgId: msg.message_id }, 'forward failed');
-      await markFailed(ctx as any);
+      await markFailed(ctx);
       deps.repo.logAudit({
         telegramId: ctx.from.id,
         chatMessageId: msg.message_id,

@@ -41,20 +41,20 @@ export function buildBot(config: Config, repo: UserRepo): Bot {
   });
 
   // Commands first so they don't get caught by the plain-message handler.
-  bot.command('start', (ctx) => handleStart(ctx as any, { repo, notify: admin.notifyAdminOfNewUser }));
+  bot.command('start', (ctx) => handleStart(ctx, { repo, notify: admin.notifyAdminOfNewUser }));
   bot.command('register', (ctx) => {
     const arg = String(ctx.match).trim();
-    return handleRegister(ctx as any, {
+    return handleRegister(ctx, {
       repo,
       notify: admin.notifyAdminOfNewUser,
       emailArg: arg,
     });
   });
 
-  bot.callbackQuery(/^(approve|reject):\d+$/, (ctx) => admin.handleCallback(ctx as any));
+  bot.callbackQuery(/^(approve|reject):\d+$/, (ctx) => admin.handleCallback(ctx));
 
   bot.on('message', async (ctx: Context) => {
-    const out = await handlePlainMessage(ctx as any, { repo, notify: admin.notifyAdminOfNewUser });
+    const out = await handlePlainMessage(ctx, { repo, notify: admin.notifyAdminOfNewUser });
     if (out.forwardToApprovedFlow) await forward(ctx);
   });
 

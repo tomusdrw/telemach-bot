@@ -6,7 +6,7 @@ ${body}`;
 }
 
 export function sanitizeSubject(raw: string): string {
-  let s = raw.trim();
+  let s = raw.replace(/[\r\n\t\f\v]+/g, ' ').trim();
   if (s.length === 0) return '';
   // strip a single pair of wrapping quotes (matching " or ')
   const m = /^(['"])(.*)\1$/s.exec(s);

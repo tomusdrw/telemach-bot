@@ -17,7 +17,16 @@ full design.
    - `OPENAI_API_KEY` (for Whisper)
    - `OPENROUTER_API_KEY`
    - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (must be a verified Resend domain)
-2. `mkdir -p data`
+2. Create the data directory with the right ownership. The container runs as the
+   `node` user (UID 1000); the bind-mount preserves host UID, so:
+
+   ```bash
+   mkdir -p data
+   sudo chown 1000:1000 data
+   ```
+
+   Skip the `chown` if your host user is already UID 1000 (typical for a fresh
+   non-root user on most Linux distros).
 3. `docker compose up -d --build`
 4. DM your bot `/start`.
 

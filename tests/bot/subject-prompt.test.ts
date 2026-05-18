@@ -25,6 +25,12 @@ describe('subject prompt', () => {
     expect(sanitizeSubject('   ')).toBe('');
   });
 
+  it('sanitizes: collapses control whitespace (newlines, tabs) to single spaces', () => {
+    expect(sanitizeSubject('Foo\nBar')).toBe('Foo Bar');
+    expect(sanitizeSubject('A\r\nB\tC')).toBe('A B C');
+    expect(sanitizeSubject('\n\nLeading newlines')).toBe('Leading newlines');
+  });
+
   it('fallbackSubject formats with username', () => {
     expect(fallbackSubject('alice')).toBe('Telegram message from @alice');
     expect(fallbackSubject(null)).toBe('Telegram message');

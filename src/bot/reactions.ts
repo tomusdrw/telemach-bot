@@ -1,10 +1,12 @@
 import { logger } from '../lib/logger';
 
+export type ReactionEmoji = '👀' | '✍' | '👍' | '💩';
+
 export interface ReactCtx {
-  react(emoji: string): Promise<unknown>;
+  react(emoji: ReactionEmoji): Promise<unknown>;
 }
 
-async function safeReact(ctx: ReactCtx, emoji: string): Promise<void> {
+async function safeReact(ctx: ReactCtx, emoji: ReactionEmoji): Promise<void> {
   try {
     await ctx.react(emoji);
   } catch (err) {
