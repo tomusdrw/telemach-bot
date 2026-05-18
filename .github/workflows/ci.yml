@@ -10,6 +10,13 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Opt actions into Node.js 24 ahead of the 2026-06-02 runner default flip.
+# Lets us catch any Node 24 incompatibility now instead of on the day GitHub
+# forces it. Removable once the listed actions release v5 / equivalent with
+# native Node 24 runtimes. See issue #14.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   ci:
     name: typecheck · test · build
