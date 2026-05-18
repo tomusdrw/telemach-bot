@@ -65,6 +65,19 @@ export function makeAdminModule(opts: AdminModuleOpts): AdminModule {
       const target = opts.repo.findById(telegramId);
       const handle = target?.username ? `@${target.username}` : `id ${telegramId}`;
 
+      // Guard against stale buttons: only act if the user is still pending.
+      // Earlier admin DMs may still have live keyboards after a newer decision.
+      if (!target || target.status !== 'PENDING_APPROVAL') {
+        await opts.api.editMessageText(
+          cq.message.chat.id,
+          cq.message.message_id,
+          `${handle} already decided (${target?.status ?? 'unknown'}).`,
+          {}
+        );
+        await ctx.answerCallbackQuery('Already decided');
+        return;
+      }
+
       if (action === 'approve') {
         opts.repo.setStatus(telegramId, 'APPROVED');
         await opts.api.editMessageText(

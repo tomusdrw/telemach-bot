@@ -88,4 +88,55 @@ describe('admin module', () => {
     expect(repo.findById(9)?.status).toBe('PENDING_EMAIL');
     expect(api.editMessageText).not.toHaveBeenCalled();
   });
+
+  it('stale approve on an already-APPROVED user is a no-op (no DM, no state change)', async () => {
+    repo.upsertNew({ telegramId: 9, username: 'bob', firstName: 'Bob' });
+    repo.setEmail(9, 'bob@x.com');     // → PENDING_APPROVAL
+    repo.setStatus(9, 'APPROVED');     // simulate prior approval
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = {
+      from: { id: 1 },
+      callbackQuery: { id: 'cb', data: 'approve:9', message: { message_id: 5, chat: { id: 1 } } },
+      answerCallbackQuery: vi.fn().mockResolvedValue(undefined),
+    };
+    await mod.handleCallback(ctx as any);
+    expect(repo.findById(9)?.status).toBe('APPROVED');
+    expect(api.editMessageText).toHaveBeenCalledWith(
+      1, 5, expect.stringMatching(/already decided.*APPROVED/i), expect.any(Object)
+    );
+    expect(api.sendMessage).not.toHaveBeenCalled();
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith('Already decided');
+  });
+
+  it('stale reject on an already-APPROVED user does not flip status', async () => {
+    repo.upsertNew({ telegramId: 9, username: 'bob', firstName: 'Bob' });
+    repo.setEmail(9, 'bob@x.com');
+    repo.setStatus(9, 'APPROVED');
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = {
+      from: { id: 1 },
+      callbackQuery: { id: 'cb', data: 'reject:9', message: { message_id: 5, chat: { id: 1 } } },
+      answerCallbackQuery: vi.fn().mockResolvedValue(undefined),
+    };
+    await mod.handleCallback(ctx as any);
+    expect(repo.findById(9)?.status).toBe('APPROVED');           // unchanged
+    expect(api.sendMessage).not.toHaveBeenCalled();              // no DM to user
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith('Already decided');
+  });
+
+  it('callback for unknown user (no row) is a no-op', async () => {
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = {
+      from: { id: 1 },
+      callbackQuery: { id: 'cb', data: 'approve:9', message: { message_id: 5, chat: { id: 1 } } },
+      answerCallbackQuery: vi.fn().mockResolvedValue(undefined),
+    };
+    await mod.handleCallback(ctx as any);
+    expect(repo.findById(9)).toBeNull();
+    expect(api.sendMessage).not.toHaveBeenCalled();
+    expect(ctx.answerCallbackQuery).toHaveBeenCalledWith('Already decided');
+  });
 });

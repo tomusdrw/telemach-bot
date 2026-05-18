@@ -38,4 +38,18 @@ describe('resend service', () => {
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
   });
+
+  it('maps Resend error object with 429 to TransientError', async () => {
+    const fake = makeFakeResend(async () => ({ data: null, error: { name: 'x', message: 'rate', statusCode: 429 } }));
+    const c = makeResendClient(fake as any);
+    await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
+  });
+
+  it('maps thrown 429 errors to TransientError', async () => {
+    const err: any = new Error('rate');
+    err.statusCode = 429;
+    const fake = makeFakeResend(async () => { throw err; });
+    const c = makeResendClient(fake as any);
+    await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
+  });
 });

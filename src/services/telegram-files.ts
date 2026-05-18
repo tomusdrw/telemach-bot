@@ -36,14 +36,24 @@ export async function downloadTelegramFile(input: DownloadInput): Promise<Downlo
   }
 
   const url = `https://api.telegram.org/file/bot${input.botToken}/${file.file_path}`;
-  const res = await fetchImpl(url);
+  let res: Awaited<ReturnType<typeof fetchImpl>>;
+  try {
+    res = await fetchImpl(url);
+  } catch (err) {
+    throw new TransientError('telegram cdn fetch failed', { provider: 'telegram', detail: err });
+  }
   if (!res.ok) {
-    if (res.status >= 500) {
+    if (res.status === 429 || res.status >= 500) {
       throw new TransientError(`telegram cdn ${res.status}`, { provider: 'telegram' });
     }
     throw new FatalError(`telegram cdn ${res.status}`, { provider: 'telegram' });
   }
-  const ab = await res.arrayBuffer();
+  let ab: ArrayBuffer;
+  try {
+    ab = await res.arrayBuffer();
+  } catch (err) {
+    throw new TransientError('telegram cdn body read failed', { provider: 'telegram', detail: err });
+  }
   if (ab.byteLength > TELEGRAM_FILE_MAX_BYTES) {
     throw new FatalError('downloaded file exceeded size limit', { provider: 'telegram' });
   }

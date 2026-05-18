@@ -7,7 +7,7 @@ export interface ResendSender {
 }
 
 function classify(statusCode: number | undefined): 'transient' | 'fatal' {
-  if (statusCode && statusCode >= 500) return 'transient';
+  if (statusCode && (statusCode === 429 || statusCode >= 500)) return 'transient';
   return 'fatal';
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { downloadTelegramFile, TELEGRAM_FILE_MAX_BYTES } from '../../src/services/telegram-files';
-import { FatalError } from '../../src/lib/errors';
+import { FatalError, TransientError } from '../../src/lib/errors';
 
 function mockFetch(status: number, body?: ArrayBuffer) {
   return vi.fn().mockResolvedValue({
@@ -59,5 +59,53 @@ describe('downloadTelegramFile', () => {
         fetchImpl: mockFetch(404),
       })
     ).rejects.toBeInstanceOf(FatalError);
+  });
+
+  it('throws TransientError on 429 from Telegram CDN', async () => {
+    const api = {
+      getFile: vi.fn().mockResolvedValue({ file_path: 'x', file_size: 10 }),
+    };
+    await expect(
+      downloadTelegramFile({
+        api: api as any,
+        botToken: 'TOK',
+        fileId: 'F',
+        fetchImpl: mockFetch(429),
+      })
+    ).rejects.toBeInstanceOf(TransientError);
+  });
+
+  it('throws TransientError when fetch itself rejects (network blip)', async () => {
+    const api = {
+      getFile: vi.fn().mockResolvedValue({ file_path: 'x', file_size: 10 }),
+    };
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('ENETUNREACH'));
+    await expect(
+      downloadTelegramFile({
+        api: api as any,
+        botToken: 'TOK',
+        fileId: 'F',
+        fetchImpl,
+      })
+    ).rejects.toBeInstanceOf(TransientError);
+  });
+
+  it('throws TransientError when res.arrayBuffer() rejects', async () => {
+    const api = {
+      getFile: vi.fn().mockResolvedValue({ file_path: 'x', file_size: 10 }),
+    };
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => { throw new Error('truncated stream'); },
+    });
+    await expect(
+      downloadTelegramFile({
+        api: api as any,
+        botToken: 'TOK',
+        fileId: 'F',
+        fetchImpl,
+      })
+    ).rejects.toBeInstanceOf(TransientError);
   });
 });

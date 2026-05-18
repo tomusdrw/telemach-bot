@@ -51,4 +51,14 @@ describe('whisper', () => {
       w.transcribe({ audio: Buffer.from('abc'), filename: 'voice.ogg' })
     ).rejects.toBeInstanceOf(FatalError);
   });
+
+  it('maps 429 rate-limit errors to TransientError', async () => {
+    const err: any = new Error('rate limited');
+    err.status = 429;
+    const fake = makeFakeOpenAI(async () => { throw err; });
+    const w = makeWhisperClient(fake as any);
+    await expect(
+      w.transcribe({ audio: Buffer.from('abc'), filename: 'voice.ogg' })
+    ).rejects.toBeInstanceOf(TransientError);
+  });
 });

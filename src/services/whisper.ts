@@ -17,8 +17,8 @@ export function makeWhisperClient(openai: OpenAI): WhisperClient {
         });
       } catch (err: any) {
         const status = err?.status as number | undefined;
-        if (status && status >= 500) {
-          throw new TransientError('whisper 5xx', { provider: 'whisper', detail: err });
+        if (status && (status === 429 || status >= 500)) {
+          throw new TransientError('whisper retryable', { provider: 'whisper', detail: err });
         }
         throw new FatalError(`whisper error: ${err?.message ?? 'unknown'}`, {
           provider: 'whisper',
