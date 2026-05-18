@@ -148,4 +148,105 @@ describe('admin module', () => {
     expect(api.sendMessage).not.toHaveBeenCalled();
     expect(ctx.answerCallbackQuery).toHaveBeenCalledWith('Already decided');
   });
+
+  // -------- /users ---------------------------------------------------------
+
+  it('/users lists known users with status', async () => {
+    repo.upsertNew({ telegramId: 9, username: 'bob', firstName: 'Bob' });
+    repo.setEmail(9, 'bob@x.com');
+    repo.setStatus(9, 'APPROVED');
+    repo.upsertNew({ telegramId: 10, username: null, firstName: 'Eve' });
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 1 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleUsersCommand(ctx as any);
+    const replyText = ctx.reply.mock.calls[0]![0] as string;
+    expect(replyText).toContain('@bob');
+    expect(replyText).toContain('APPROVED');
+    expect(replyText).toContain('id 10');
+    expect(replyText).toContain('PENDING_EMAIL');
+    expect(replyText).toContain('[admin]'); // the seeded admin
+  });
+
+  it('/users ignores non-admin', async () => {
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 9 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleUsersCommand(ctx as any);
+    expect(ctx.reply).not.toHaveBeenCalled();
+  });
+
+  // -------- /revoke --------------------------------------------------------
+
+  it('/revoke flips APPROVED user to REJECTED', async () => {
+    repo.upsertNew({ telegramId: 9, username: 'bob', firstName: 'Bob' });
+    repo.setEmail(9, 'bob@x.com');
+    repo.setStatus(9, 'APPROVED');
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 1 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleRevokeCommand(ctx as any, '9');
+    expect(repo.findById(9)?.status).toBe('REJECTED');
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/Revoked @bob/i));
+  });
+
+  it('/revoke on non-APPROVED user does not change status', async () => {
+    repo.upsertNew({ telegramId: 9, username: 'bob', firstName: 'Bob' });
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 1 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleRevokeCommand(ctx as any, '9');
+    expect(repo.findById(9)?.status).toBe('PENDING_EMAIL'); // unchanged
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/not APPROVED/i));
+  });
+
+  it('/revoke refuses to act on admin', async () => {
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 1 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleRevokeCommand(ctx as any, '1');
+    expect(repo.findById(1)?.status).toBe('APPROVED'); // admin untouched
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/refusing to revoke admin/i));
+  });
+
+  it('/revoke with non-numeric arg replies usage', async () => {
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 1 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleRevokeCommand(ctx as any, 'abc');
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/usage/i));
+  });
+
+  it('/revoke ignores non-admin', async () => {
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 9 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleRevokeCommand(ctx as any, '1');
+    expect(ctx.reply).not.toHaveBeenCalled();
+  });
+
+  // -------- /reset ---------------------------------------------------------
+
+  it('/reset clears email and sets status to PENDING_EMAIL', async () => {
+    repo.upsertNew({ telegramId: 9, username: 'bob', firstName: 'Bob' });
+    repo.setEmail(9, 'bob@x.com');
+    repo.setStatus(9, 'REJECTED');
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 1 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleResetCommand(ctx as any, '9');
+    const u = repo.findById(9)!;
+    expect(u.status).toBe('PENDING_EMAIL');
+    expect(u.email).toBeNull();
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/Reset @bob/i));
+  });
+
+  it('/reset refuses to act on admin', async () => {
+    const api = fakeApi();
+    const mod = makeAdminModule({ api: api as any, adminTelegramUserId: 1, repo });
+    const ctx = { from: { id: 1 }, reply: vi.fn().mockResolvedValue(undefined) };
+    await mod.handleResetCommand(ctx as any, '1');
+    expect(repo.findById(1)?.status).toBe('APPROVED');
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/refusing to reset admin/i));
+  });
 });
