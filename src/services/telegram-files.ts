@@ -29,10 +29,10 @@ export async function downloadTelegramFile(input: DownloadInput): Promise<Downlo
     throw new FatalError('telegram returned no file_path', { provider: 'telegram', detail: file });
   }
   if (typeof file.file_size === 'number' && file.file_size > TELEGRAM_FILE_MAX_BYTES) {
-    throw new FatalError(
-      `file too large (${file.file_size} > ${TELEGRAM_FILE_MAX_BYTES})`,
-      { provider: 'telegram', detail: file }
-    );
+    throw new FatalError(`file too large (${file.file_size} > ${TELEGRAM_FILE_MAX_BYTES})`, {
+      provider: 'telegram',
+      detail: file,
+    });
   }
 
   const url = `https://api.telegram.org/file/bot${input.botToken}/${file.file_path}`;

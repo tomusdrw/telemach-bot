@@ -1,6 +1,6 @@
 // src/bot/onboarding.ts
 import { z } from 'zod';
-import { UserRepo } from '../db/users';
+import type { UserRepo } from '../db/users';
 import { decideAction } from './auth';
 
 export interface NotifyAdminInput {
@@ -54,10 +54,7 @@ export async function handleStart(ctx: MinimalCtx, deps: OnboardingDeps): Promis
   }
 }
 
-export async function handleRegister(
-  ctx: MinimalCtx,
-  deps: OnboardingDepsWithEmail
-): Promise<void> {
+export async function handleRegister(ctx: MinimalCtx, deps: OnboardingDepsWithEmail): Promise<void> {
   if (!ctx.from) return;
   const parsed = emailSchema.safeParse(deps.emailArg);
   if (!parsed.success) {
@@ -108,7 +105,7 @@ export interface PlainMessageOutcome {
 
 export async function handlePlainMessage(
   ctx: MinimalCtx,
-  deps: OnboardingDeps
+  deps: OnboardingDeps,
 ): Promise<PlainMessageOutcome> {
   if (!ctx.from) return { forwardToApprovedFlow: false };
   const action = decideAction(userView(deps.repo, ctx.from.id), { kind: 'message' });

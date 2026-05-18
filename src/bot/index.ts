@@ -1,15 +1,15 @@
 // src/bot/index.ts
 import { Bot, type Context } from 'grammy';
 import type { Config } from '../config';
-import { UserRepo } from '../db/users';
-import { handleStart, handleRegister, handlePlainMessage } from './onboarding';
+import type { UserRepo } from '../db/users';
+import { logger } from '../lib/logger';
+import { defaultResendClient, makeResendClient } from '../services/resend';
+import { makeSubjectClient } from '../services/subject';
+import { downloadTelegramFile } from '../services/telegram-files';
+import { makeTranscriptionClient } from '../services/transcription';
 import { makeAdminModule } from './admin';
 import { makeForwardHandler } from './forward';
-import { makeTranscriptionClient } from '../services/transcription';
-import { makeSubjectClient } from '../services/subject';
-import { makeResendClient, defaultResendClient } from '../services/resend';
-import { downloadTelegramFile } from '../services/telegram-files';
-import { logger } from '../lib/logger';
+import { handlePlainMessage, handleRegister, handleStart } from './onboarding';
 
 export function buildBot(config: Config, repo: UserRepo): Bot {
   const bot = new Bot(config.telegramBotToken);

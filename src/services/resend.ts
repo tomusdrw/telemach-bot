@@ -1,9 +1,14 @@
 import { Resend } from 'resend';
-import { FatalError, TransientError } from '../lib/errors';
 import type { EmailPayload } from '../bot/email-composer';
+import { FatalError, TransientError } from '../lib/errors';
 
 export interface ResendSender {
   send(payload: EmailPayload): Promise<string>; // returns Resend message id
+}
+
+interface ProviderError {
+  statusCode?: number;
+  message?: string;
 }
 
 function classify(statusCode: number | undefined): 'transient' | 'fatal' {
@@ -11,10 +16,20 @@ function classify(statusCode: number | undefined): 'transient' | 'fatal' {
   return 'fatal';
 }
 
+function asProviderError(err: unknown): ProviderError {
+  if (typeof err !== 'object' || err === null) return {};
+  const e = err as Record<string, unknown>;
+  return {
+    statusCode: typeof e.statusCode === 'number' ? e.statusCode : undefined,
+    message: typeof e.message === 'string' ? e.message : undefined,
+  };
+}
+
 export function makeResendClient(resend: Resend): ResendSender {
   return {
     async send(p) {
       try {
+        // biome-ignore lint/suspicious/noExplicitAny: Resend v3 overloads conflict with EmailPayload, tracked in #2
         const result = await (resend.emails.send as any)({
           from: p.from,
           to: p.to,
@@ -35,11 +50,12 @@ export function makeResendClient(resend: Resend): ResendSender {
           });
         }
         return result.data?.id ?? '';
-      } catch (err: any) {
+      } catch (err) {
         if (err instanceof TransientError || err instanceof FatalError) throw err;
-        const cls = classify(err?.statusCode);
+        const pe = asProviderError(err);
+        const cls = classify(pe.statusCode);
         const Cls = cls === 'transient' ? TransientError : FatalError;
-        throw new Cls(`resend: ${err?.message ?? 'unknown'}`, {
+        throw new Cls(`resend: ${pe.message ?? 'unknown'}`, {
           provider: 'resend',
           detail: err,
         });

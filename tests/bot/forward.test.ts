@@ -1,10 +1,10 @@
 // tests/bot/forward.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { makeForwardHandler } from '../../src/bot/forward';
 import { UserRepo } from '../../src/db/users';
-import { makeTempDb } from '../helpers/temp-db';
-import { buildFakeCtx } from '../helpers/fake-ctx';
 import { FatalError } from '../../src/lib/errors';
+import { buildFakeCtx } from '../helpers/fake-ctx';
+import { makeTempDb } from '../helpers/temp-db';
 
 function makeDeps(overrides: Partial<any> = {}) {
   const repo = new UserRepo(makeTempDb());
@@ -80,7 +80,9 @@ describe('forward handler', () => {
   it('document message: attaches with original filename', async () => {
     const { deps } = makeDeps({
       download: vi.fn().mockResolvedValue({
-        buffer: Buffer.from([1]), filename: 'report.pdf', mimeType: null,
+        buffer: Buffer.from([1]),
+        filename: 'report.pdf',
+        mimeType: null,
       }),
     });
     const handler = makeForwardHandler(deps as any);
@@ -105,7 +107,9 @@ describe('forward handler', () => {
 
   it('FatalError during transcription sets 💩, no email sent', async () => {
     const { deps } = makeDeps({
-      transcription: { transcribe: vi.fn().mockRejectedValue(new FatalError('empty', { provider: 'openrouter' })) },
+      transcription: {
+        transcribe: vi.fn().mockRejectedValue(new FatalError('empty', { provider: 'openrouter' })),
+      },
     });
     const handler = makeForwardHandler(deps as any);
     const ctx = buildFakeCtx({
@@ -118,7 +122,9 @@ describe('forward handler', () => {
 
   it('Resend failure after Whisper success sets 💩 (no further work)', async () => {
     const { deps } = makeDeps({
-      resend: { send: vi.fn().mockRejectedValue(new FatalError('domain not verified', { provider: 'resend' })) },
+      resend: {
+        send: vi.fn().mockRejectedValue(new FatalError('domain not verified', { provider: 'resend' })),
+      },
     });
     const handler = makeForwardHandler(deps as any);
     const ctx = buildFakeCtx({

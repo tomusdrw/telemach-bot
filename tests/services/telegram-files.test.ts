@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { downloadTelegramFile, TELEGRAM_FILE_MAX_BYTES } from '../../src/services/telegram-files';
+import { describe, expect, it, vi } from 'vitest';
 import { FatalError, TransientError } from '../../src/lib/errors';
+import { downloadTelegramFile, TELEGRAM_FILE_MAX_BYTES } from '../../src/services/telegram-files';
 
 function mockFetch(status: number, body?: ArrayBuffer) {
   return vi.fn().mockResolvedValue({
@@ -25,9 +25,7 @@ describe('downloadTelegramFile', () => {
     expect(result.buffer.equals(Buffer.from([1, 2, 3]))).toBe(true);
     expect(result.filename).toBe('file.ogg');
     expect(api.getFile).toHaveBeenCalledWith('F');
-    expect(fetchImpl).toHaveBeenCalledWith(
-      'https://api.telegram.org/file/botTOK/voice/file.ogg'
-    );
+    expect(fetchImpl).toHaveBeenCalledWith('https://api.telegram.org/file/botTOK/voice/file.ogg');
   });
 
   it('throws FatalError when file_size exceeds limit', async () => {
@@ -43,7 +41,7 @@ describe('downloadTelegramFile', () => {
         botToken: 'TOK',
         fileId: 'F',
         fetchImpl: mockFetch(200),
-      })
+      }),
     ).rejects.toBeInstanceOf(FatalError);
   });
 
@@ -57,7 +55,7 @@ describe('downloadTelegramFile', () => {
         botToken: 'TOK',
         fileId: 'F',
         fetchImpl: mockFetch(404),
-      })
+      }),
     ).rejects.toBeInstanceOf(FatalError);
   });
 
@@ -71,7 +69,7 @@ describe('downloadTelegramFile', () => {
         botToken: 'TOK',
         fileId: 'F',
         fetchImpl: mockFetch(429),
-      })
+      }),
     ).rejects.toBeInstanceOf(TransientError);
   });
 
@@ -86,7 +84,7 @@ describe('downloadTelegramFile', () => {
         botToken: 'TOK',
         fileId: 'F',
         fetchImpl,
-      })
+      }),
     ).rejects.toBeInstanceOf(TransientError);
   });
 
@@ -97,7 +95,9 @@ describe('downloadTelegramFile', () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      arrayBuffer: async () => { throw new Error('truncated stream'); },
+      arrayBuffer: async () => {
+        throw new Error('truncated stream');
+      },
     });
     await expect(
       downloadTelegramFile({
@@ -105,7 +105,7 @@ describe('downloadTelegramFile', () => {
         botToken: 'TOK',
         fileId: 'F',
         fetchImpl,
-      })
+      }),
     ).rejects.toBeInstanceOf(TransientError);
   });
 });

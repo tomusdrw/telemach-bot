@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseConfig } from '../src/config';
 
 const baseEnv = {
@@ -29,13 +29,13 @@ describe('parseConfig', () => {
   });
 
   it('throws when ADMIN_TELEGRAM_USER_ID is not numeric', () => {
-    expect(() => parseConfig({ ...baseEnv, ADMIN_TELEGRAM_USER_ID: 'abc' }))
-      .toThrow(/ADMIN_TELEGRAM_USER_ID/);
+    expect(() => parseConfig({ ...baseEnv, ADMIN_TELEGRAM_USER_ID: 'abc' })).toThrow(
+      /ADMIN_TELEGRAM_USER_ID/,
+    );
   });
 
   it('throws when ADMIN_EMAIL is not an email', () => {
-    expect(() => parseConfig({ ...baseEnv, ADMIN_EMAIL: 'notanemail' }))
-      .toThrow(/ADMIN_EMAIL/);
+    expect(() => parseConfig({ ...baseEnv, ADMIN_EMAIL: 'notanemail' })).toThrow(/ADMIN_EMAIL/);
   });
 
   it('throws when OPENROUTER_API_KEY is missing', () => {

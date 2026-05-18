@@ -1,6 +1,7 @@
 // tests/helpers/fake-ctx.ts
-import { vi } from 'vitest';
+
 import type { Message } from 'grammy/types';
+import { vi } from 'vitest';
 
 export interface FakeCtx {
   from: { id: number; username?: string; first_name?: string };
