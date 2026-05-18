@@ -60,6 +60,16 @@ describe('onboarding handlers', () => {
     expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/not a valid email/i));
   });
 
+  it('/register with empty argument tells the user to provide one', async () => {
+    repo.upsertNew({ telegramId: 7, username: 'u', firstName: 'F' });
+    const ctx = makeCtx();
+    await handleRegister(ctx as any, { repo, notify, emailArg: '' });
+    expect(repo.findById(7)?.email).toBeNull();
+    expect(repo.findById(7)?.status).toBe('PENDING_EMAIL');
+    expect(notify).not.toHaveBeenCalled();
+    expect(ctx.reply).toHaveBeenCalledWith(expect.stringMatching(/not a valid email/i));
+  });
+
   it('/register from approved user replies "cannot be changed"', async () => {
     repo.upsertNew({ telegramId: 7, username: 'u', firstName: 'F' });
     repo.setEmail(7, 'old@x.com');

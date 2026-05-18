@@ -116,6 +116,20 @@ describe('forward handler', () => {
     expect(deps.resend.send).not.toHaveBeenCalled();
   });
 
+  it('Resend failure after Whisper success sets 💩 (no further work)', async () => {
+    const { deps } = makeDeps({
+      resend: { send: vi.fn().mockRejectedValue(new FatalError('domain not verified', { provider: 'resend' })) },
+    });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({
+      voice: { file_id: 'vf', file_unique_id: 'u', duration: 3 } as any,
+    });
+    await handler(ctx as any);
+    expect(deps.whisper.transcribe).toHaveBeenCalled();
+    expect(deps.resend.send).toHaveBeenCalledTimes(1);
+    expect(ctx.react.mock.calls.map((c) => c[0])).toEqual(['👀', '✍', '💩']);
+  });
+
   it('media group: combines multiple messages into one email', async () => {
     const { deps } = makeDeps();
     const handler = makeForwardHandler(deps as any);
@@ -139,5 +153,34 @@ describe('forward handler', () => {
     expect(deps.resend.send).toHaveBeenCalledTimes(1);
     const payload = deps.resend.send.mock.calls[0][0];
     expect(payload.attachments).toHaveLength(2);
+  });
+
+  it('media group flush failure marks every item with 💩', async () => {
+    const { deps } = makeDeps({
+      resend: { send: vi.fn().mockRejectedValue(new FatalError('boom', { provider: 'resend' })) },
+    });
+    const handler = makeForwardHandler(deps as any);
+    const ctxs = [
+      buildFakeCtx({
+        media_group_id: 'g2',
+        photo: [{ file_id: 'p1', file_unique_id: '1', width: 800, height: 800 }] as any,
+      }),
+      buildFakeCtx({
+        media_group_id: 'g2',
+        photo: [{ file_id: 'p2', file_unique_id: '2', width: 800, height: 800 }] as any,
+      }),
+    ];
+    for (const c of ctxs) await handler(c as any);
+
+    await vi.waitFor(() => {
+      for (const c of ctxs) {
+        expect(c.react.mock.calls.some((call) => call[0] === '💩')).toBe(true);
+      }
+    });
+    // Each item should have seen 👀 (received) then ✍ (working) then 💩 (failed)
+    for (const c of ctxs) {
+      const emojis = c.react.mock.calls.map((call) => call[0]);
+      expect(emojis).toEqual(['👀', '✍', '💩']);
+    }
   });
 });

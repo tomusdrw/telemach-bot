@@ -48,3 +48,56 @@ npm run dev
   the email body. Original audio is not attached.
 - Photos/documents/videos/audio/animations/stickers are attached verbatim.
 - Multiple photos uploaded together bundle into one email.
+
+## Troubleshooting
+
+- **💩 reaction on every message.** Check the container logs (`docker compose
+  logs -f telemach-bot`). The error class (`TransientError`/`FatalError`) and
+  provider (`whisper` / `openrouter` / `resend` / `telegram` / `db`) are in
+  every error line. The most common first-deploy cause is an unverified
+  `RESEND_FROM_EMAIL` domain — verify the domain at
+  <https://resend.com/domains> before sending the first message.
+
+- **Container exits immediately with "Invalid environment".** A required env
+  var is missing. The fatal log line lists every missing or invalid var name.
+
+- **`EACCES: permission denied, open '/data/bot.db'`.** The bind-mounted host
+  directory is owned by the wrong UID. Run `sudo chown 1000:1000 data` on the
+  host.
+
+- **Bot never responds to `/start`.** Double-check `TELEGRAM_BOT_TOKEN`. The
+  container logs a `{"msg":"bot online"}` line on successful login.
+
+- **Approved user can't actually send anything.** Confirm the admin tapped
+  Approve (look for `Approved @username ✓` in your own admin DM). If the
+  status got stuck in `PENDING_APPROVAL`, fix it directly:
+
+  ```bash
+  docker compose exec telemach-bot \
+    sqlite3 /data/bot.db "UPDATE users SET status='APPROVED' WHERE telegram_id=<id>;"
+  ```
+
+- **Disable / un-approve a user (no command for this yet).**
+
+  ```bash
+  docker compose exec telemach-bot \
+    sqlite3 /data/bot.db "UPDATE users SET status='REJECTED' WHERE telegram_id=<id>;"
+  ```
+
+- **See recent activity for a user.**
+
+  ```bash
+  docker compose exec telemach-bot \
+    sqlite3 /data/bot.db \
+    "SELECT created_at, event, details FROM audit_log
+       WHERE telegram_id=<id> ORDER BY id DESC LIMIT 20;"
+  ```
+
+## Updating
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+The SQLite file in `./data/bot.db` survives rebuilds.
