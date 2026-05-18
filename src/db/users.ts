@@ -27,6 +27,14 @@ export interface AuditInput {
   details: string | null;
 }
 
+export interface PersistedMediaGroupItem {
+  telegramId: number;
+  chatId: number;
+  messageId: number;
+  payloadJson: string;
+  receivedAt: number;
+}
+
 const now = () => Math.floor(Date.now() / 1000);
 
 interface UserRow {
@@ -107,6 +115,67 @@ export class UserRepo {
         `UPDATE users SET email = NULL, status = 'PENDING_EMAIL', updated_at = ? WHERE telegram_id = ?`,
       )
       .run(t, telegramId);
+  }
+
+  // ---- media_group_pending --------------------------------------------------
+
+  addMediaGroupItem(input: {
+    groupId: string;
+    telegramId: number;
+    chatId: number;
+    messageId: number;
+    payloadJson: string;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO media_group_pending
+           (group_id, telegram_id, chat_id, message_id, payload_json, received_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(input.groupId, input.telegramId, input.chatId, input.messageId, input.payloadJson, now());
+  }
+
+  deleteMediaGroupRows(groupId: string): void {
+    this.db.prepare(`DELETE FROM media_group_pending WHERE group_id = ?`).run(groupId);
+  }
+
+  /**
+   * Group all rows by group_id and return one entry per group, oldest first.
+   * Used on startup to replay any group that didn't flush before the previous
+   * process exited.
+   */
+  listAllPendingMediaGroups(): { groupId: string; items: PersistedMediaGroupItem[] }[] {
+    const rows = this.db
+      .prepare<
+        [],
+        {
+          group_id: string;
+          telegram_id: number;
+          chat_id: number;
+          message_id: number;
+          payload_json: string;
+          received_at: number;
+        }
+      >(
+        `SELECT group_id, telegram_id, chat_id, message_id, payload_json, received_at
+         FROM media_group_pending
+         ORDER BY received_at ASC, id ASC`,
+      )
+      .all();
+    const byGroup = new Map<string, PersistedMediaGroupItem[]>();
+    for (const r of rows) {
+      const item: PersistedMediaGroupItem = {
+        telegramId: r.telegram_id,
+        chatId: r.chat_id,
+        messageId: r.message_id,
+        payloadJson: r.payload_json,
+        receivedAt: r.received_at,
+      };
+      const existing = byGroup.get(r.group_id);
+      if (existing) existing.push(item);
+      else byGroup.set(r.group_id, [item]);
+    }
+    return Array.from(byGroup, ([groupId, items]) => ({ groupId, items }));
   }
 
   seedAdmin(input: { telegramId: number; email: string }): void {

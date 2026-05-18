@@ -87,13 +87,53 @@ function attachmentCountLabel(n: number): string {
   return n === 1 ? '(1 attachment)' : `(${n} attachments)`;
 }
 
-type ForwardItem = {
-  ctx: Context;
+/**
+ * What we persist per message in `media_group_pending.payload_json` and what
+ * flows through the work pipeline. Replay reconstructs these from the DB.
+ */
+interface PersistedPayload {
+  kind: MsgKind;
   user: { email: string; username: string | null; firstName: string | null; telegramId: number };
-};
+}
 
-export function makeForwardHandler(deps: ForwardDeps) {
-  async function buildAndSend(items: ForwardItem[]): Promise<void> {
+interface WorkItem {
+  ctx: Context | null; // null only on startup replay
+  chatId: number;
+  messageId: number;
+  telegramId: number;
+  payload: PersistedPayload;
+}
+
+// Reaction helpers that pick ctx-based or api-based depending on path.
+async function reactWorking(item: WorkItem, api: Api): Promise<void> {
+  if (item.ctx) return markWorking(item.ctx);
+  await safeApiReact(api, item.chatId, item.messageId, '✍');
+}
+async function reactDone(item: WorkItem, api: Api): Promise<void> {
+  if (item.ctx) return markDone(item.ctx);
+  await safeApiReact(api, item.chatId, item.messageId, '👍');
+}
+async function reactFailed(item: WorkItem, api: Api): Promise<void> {
+  if (item.ctx) return markFailed(item.ctx);
+  await safeApiReact(api, item.chatId, item.messageId, '💩');
+}
+
+async function safeApiReact(api: Api, chatId: number, messageId: number, emoji: string): Promise<void> {
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: grammy's reaction emoji union is narrower than our 4-emoji set
+    await api.setMessageReaction(chatId, messageId, [{ type: 'emoji', emoji: emoji as any }]);
+  } catch (err) {
+    logger.warn({ err, emoji, chatId, messageId }, 'failed to set reaction via api (ignored)');
+  }
+}
+
+export interface ForwardHandler {
+  (ctx: Context): Promise<void>;
+  replayPending(): Promise<void>;
+}
+
+export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
+  async function buildAndSend(items: WorkItem[]): Promise<void> {
     if (items.length === 0) return;
     const first = items[0]!;
 
@@ -102,9 +142,7 @@ export function makeForwardHandler(deps: ForwardDeps) {
     let transcribedBody: string | null = null;
 
     for (const it of items) {
-      const msg = it.ctx.message;
-      if (!msg) continue;
-      const kind = classify(msg);
+      const kind = it.payload.kind;
       if (!kind.fileId) {
         if (kind.text) captions.push(kind.text);
         continue;
@@ -119,8 +157,8 @@ export function makeForwardHandler(deps: ForwardDeps) {
           { delaysMs: deps.retryDelays },
         );
         deps.repo.logAudit({
-          telegramId: it.ctx.from?.id ?? 0,
-          chatMessageId: msg.message_id,
+          telegramId: it.telegramId,
+          chatMessageId: it.messageId,
           event: 'transcribed',
           details: null,
         });
@@ -135,15 +173,15 @@ export function makeForwardHandler(deps: ForwardDeps) {
       body || (attachments.length > 0 ? attachmentCountLabel(attachments.length) : '(no text)');
     const rawSubject = await deps.subject.generateSubject(subjectInput);
     const subject = rawSubject
-      ? sanitizeSubject(rawSubject) || fallbackSubject(first.user.username)
-      : fallbackSubject(first.user.username);
+      ? sanitizeSubject(rawSubject) || fallbackSubject(first.payload.user.username)
+      : fallbackSubject(first.payload.user.username);
 
     const payload = composeEmail({
       fromEmail: deps.fromEmail,
-      toEmail: first.user.email,
-      username: first.user.username,
-      firstName: first.user.firstName,
-      telegramId: first.user.telegramId,
+      toEmail: first.payload.user.email,
+      username: first.payload.user.username,
+      firstName: first.payload.user.firstName,
+      telegramId: first.payload.user.telegramId,
       subject,
       body,
       attachments,
@@ -152,26 +190,32 @@ export function makeForwardHandler(deps: ForwardDeps) {
     await withRetry(() => deps.resend.send(payload), { delaysMs: deps.retryDelays });
 
     deps.repo.logAudit({
-      telegramId: first.ctx.from?.id ?? 0,
-      chatMessageId: first.ctx.message?.message_id ?? null,
+      telegramId: first.telegramId,
+      chatMessageId: first.messageId,
       event: 'emailed',
       details:
         items.length > 1 ? JSON.stringify({ group: items.length, attachments: attachments.length }) : null,
     });
   }
 
-  const buffer = new MediaGroupBuffer<ForwardItem>(deps.mediaGroupFlushMs, async (groupId, items) => {
+  async function processGroup(groupId: string, items: WorkItem[]): Promise<void> {
     try {
-      for (const it of items) await markWorking(it.ctx);
+      for (const it of items) await reactWorking(it, deps.api);
       await buildAndSend(items);
-      for (const it of items) await markDone(it.ctx);
+      for (const it of items) await reactDone(it, deps.api);
     } catch (err) {
       logger.error({ err, groupId }, 'media-group flush failed');
-      for (const it of items) await markFailed(it.ctx);
+      for (const it of items) await reactFailed(it, deps.api);
+    } finally {
+      deps.repo.deleteMediaGroupRows(groupId);
     }
+  }
+
+  const buffer = new MediaGroupBuffer<WorkItem>(deps.mediaGroupFlushMs, async (groupId, items) => {
+    await processGroup(groupId, items);
   });
 
-  return async function handle(ctx: Context): Promise<void> {
+  const handler: ForwardHandler = async (ctx: Context): Promise<void> => {
     const msg = ctx.message;
     if (!msg || !ctx.from) return;
     const user = deps.repo.findById(ctx.from.id);
@@ -186,8 +230,9 @@ export function makeForwardHandler(deps: ForwardDeps) {
 
     await markReceived(ctx);
 
-    const item: ForwardItem = {
-      ctx,
+    const kind = classify(msg);
+    const payload: PersistedPayload = {
+      kind,
       user: {
         email: user.email,
         username: user.username,
@@ -195,8 +240,22 @@ export function makeForwardHandler(deps: ForwardDeps) {
         telegramId: user.telegramId,
       },
     };
+    const item: WorkItem = {
+      ctx,
+      chatId: ctx.chat?.id ?? ctx.from.id,
+      messageId: msg.message_id,
+      telegramId: ctx.from.id,
+      payload,
+    };
 
     if (msg.media_group_id) {
+      deps.repo.addMediaGroupItem({
+        groupId: msg.media_group_id,
+        telegramId: item.telegramId,
+        chatId: item.chatId,
+        messageId: item.messageId,
+        payloadJson: JSON.stringify(payload),
+      });
       buffer.add(msg.media_group_id, item);
       return;
     }
@@ -222,4 +281,37 @@ export function makeForwardHandler(deps: ForwardDeps) {
       });
     }
   };
+
+  handler.replayPending = async (): Promise<void> => {
+    const groups = deps.repo.listAllPendingMediaGroups();
+    if (groups.length === 0) return;
+    logger.info({ groups: groups.length }, 'replaying pending media groups from previous run');
+    for (const { groupId, items: rows } of groups) {
+      const items: WorkItem[] = [];
+      for (const r of rows) {
+        try {
+          const payload = JSON.parse(r.payloadJson) as PersistedPayload;
+          items.push({
+            ctx: null,
+            chatId: r.chatId,
+            messageId: r.messageId,
+            telegramId: r.telegramId,
+            payload,
+          });
+        } catch (err) {
+          logger.warn(
+            { err, groupId, messageId: r.messageId },
+            'pending media-group payload unparseable; dropping',
+          );
+        }
+      }
+      if (items.length === 0) {
+        deps.repo.deleteMediaGroupRows(groupId);
+        continue;
+      }
+      await processGroup(groupId, items);
+    }
+  };
+
+  return handler;
 }

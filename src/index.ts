@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const repo = new UserRepo(db);
   repo.seedAdmin({ telegramId: config.adminTelegramUserId, email: config.adminEmail });
 
-  const bot = buildBot(config, repo);
+  const { bot, forward } = buildBot(config, repo);
 
   const stop = async (signal: string) => {
     logger.info({ signal }, 'stopping bot');
@@ -27,7 +27,10 @@ async function main(): Promise<void> {
   logger.info({ admin: config.adminTelegramUserId }, 'starting bot (long polling)');
   await bot.start({
     allowed_updates: ['message', 'callback_query'],
-    onStart: (botInfo) => logger.info({ bot: botInfo.username }, 'bot online'),
+    onStart: async (botInfo) => {
+      logger.info({ bot: botInfo.username }, 'bot online');
+      await forward.replayPending();
+    },
   });
 }
 

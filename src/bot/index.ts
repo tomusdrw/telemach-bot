@@ -8,10 +8,15 @@ import { makeSubjectClient } from '../services/subject';
 import { downloadTelegramFile } from '../services/telegram-files';
 import { makeTranscriptionClient } from '../services/transcription';
 import { makeAdminModule } from './admin';
-import { makeForwardHandler } from './forward';
+import { type ForwardHandler, makeForwardHandler } from './forward';
 import { handlePlainMessage, handleRegister, handleStart } from './onboarding';
 
-export function buildBot(config: Config, repo: UserRepo): Bot {
+export interface BuiltBot {
+  bot: Bot;
+  forward: ForwardHandler;
+}
+
+export function buildBot(config: Config, repo: UserRepo): BuiltBot {
   const bot = new Bot(config.telegramBotToken);
 
   const transcription = makeTranscriptionClient({
@@ -69,5 +74,5 @@ export function buildBot(config: Config, repo: UserRepo): Bot {
     logger.error({ err: err.error, ctxUpdate: err.ctx.update }, 'unhandled bot error');
   });
 
-  return bot;
+  return { bot, forward };
 }
