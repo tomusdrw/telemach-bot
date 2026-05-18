@@ -9,7 +9,7 @@ import { sanitizeSubject, fallbackSubject } from './subject-prompt';
 import { MediaGroupBuffer } from './media-group';
 import { markReceived, markWorking, markDone, markFailed } from './reactions';
 import type { ResendSender } from '../services/resend';
-import type { WhisperClient } from '../services/whisper';
+import type { TranscriptionClient } from '../services/transcription';
 import type { SubjectClient } from '../services/subject';
 
 export interface ForwardDeps {
@@ -18,7 +18,7 @@ export interface ForwardDeps {
   botToken: string;
   api: Api;
   subject: SubjectClient;
-  whisper: WhisperClient;
+  transcription: TranscriptionClient;
   resend: ResendSender;
   download: (input: { api: Api; botToken: string; fileId: string }) => Promise<{
     buffer: Buffer;
@@ -100,7 +100,7 @@ export function makeForwardHandler(deps: ForwardDeps) {
       );
       if (kind.isVoice) {
         transcribedBody = await withRetry(
-          () => deps.whisper.transcribe({ audio: dl.buffer, filename: dl.filename }),
+          () => deps.transcription.transcribe({ audio: dl.buffer, filename: dl.filename }),
           { delaysMs: deps.retryDelays }
         );
         deps.repo.logAudit({

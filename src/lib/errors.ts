@@ -1,5 +1,5 @@
 export interface ErrorContext {
-  provider: 'whisper' | 'openrouter' | 'resend' | 'telegram' | 'db';
+  provider: 'openrouter' | 'resend' | 'telegram' | 'db';
   detail?: unknown;
 }
 

@@ -15,7 +15,7 @@ function makeDeps(overrides: Partial<any> = {}) {
     repo,
     fromEmail: 'bot@x.com',
     subject: { generateSubject: vi.fn().mockResolvedValue('Lunch plans') },
-    whisper: { transcribe: vi.fn().mockResolvedValue('hello voice') },
+    transcription: { transcribe: vi.fn().mockResolvedValue('hello voice') },
     resend: { send: vi.fn().mockResolvedValue('re-1') },
     download: vi.fn().mockResolvedValue({
       buffer: Buffer.from([1, 2, 3]),
@@ -53,7 +53,7 @@ describe('forward handler', () => {
     });
     await handler(ctx as any);
     expect(deps.download).toHaveBeenCalledWith(expect.objectContaining({ fileId: 'vf' }));
-    expect(deps.whisper.transcribe).toHaveBeenCalledTimes(1);
+    expect(deps.transcription.transcribe).toHaveBeenCalledTimes(1);
     const payload = deps.resend.send.mock.calls[0][0];
     expect(payload.text).toContain('hello voice');
     expect(payload.attachments).toEqual([]); // voice → transcript only
@@ -103,9 +103,9 @@ describe('forward handler', () => {
     expect(payload.subject).toBe('Telegram message from @alice');
   });
 
-  it('FatalError during whisper sets 💩, no email sent', async () => {
+  it('FatalError during transcription sets 💩, no email sent', async () => {
     const { deps } = makeDeps({
-      whisper: { transcribe: vi.fn().mockRejectedValue(new FatalError('empty', { provider: 'whisper' })) },
+      transcription: { transcribe: vi.fn().mockRejectedValue(new FatalError('empty', { provider: 'openrouter' })) },
     });
     const handler = makeForwardHandler(deps as any);
     const ctx = buildFakeCtx({
@@ -125,7 +125,7 @@ describe('forward handler', () => {
       voice: { file_id: 'vf', file_unique_id: 'u', duration: 3 } as any,
     });
     await handler(ctx as any);
-    expect(deps.whisper.transcribe).toHaveBeenCalled();
+    expect(deps.transcription.transcribe).toHaveBeenCalled();
     expect(deps.resend.send).toHaveBeenCalledTimes(1);
     expect(ctx.react.mock.calls.map((c) => c[0])).toEqual(['👀', '✍', '💩']);
   });

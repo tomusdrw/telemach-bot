@@ -1,6 +1,6 @@
 # CLAUDE.md — telemach-bot
 
-Personal Telegram bot that forwards messages and voice transcripts to email. Single Node 22 / TypeScript process, long-polling against Telegram, SQLite for state, Resend for email, OpenAI Whisper for voice, OpenRouter for subject generation. Runs in one Docker container with a bind-mounted `/data` volume.
+Personal Telegram bot that forwards messages and voice transcripts to email. Single Node 22 / TypeScript process, long-polling against Telegram, SQLite for state, Resend for email, and OpenRouter for both transcription (`/audio/transcriptions`) and subject generation. Runs in one Docker container with a bind-mounted `/data` volume.
 
 ## Where things live
 
@@ -19,11 +19,11 @@ src/
     ├── subject-prompt.ts   # pure: prompt + sanitize + fallback
     ├── onboarding.ts       # /start, /register, plain-message gate
     ├── admin.ts            # approve/reject DM + callback handlers
-    └── forward.ts          # main orchestration: classify → download → (whisper|attach) → subject → send
+    └── forward.ts          # main orchestration: classify → download → (transcribe|attach) → subject → send
 └── services/
     ├── telegram-files.ts   # getFile + CDN download, 20MB cap
-    ├── whisper.ts          # OpenAI Whisper
-    ├── subject.ts          # OpenRouter (single attempt, null on failure)
+    ├── transcription.ts    # OpenRouter /audio/transcriptions (base64 JSON body)
+    ├── subject.ts          # OpenRouter chat-completions (single attempt, null on failure)
     └── resend.ts           # Resend email send
 tests/                      # mirrors src/, plus tests/helpers/{temp-db,fake-ctx}.ts
 docs/superpowers/
