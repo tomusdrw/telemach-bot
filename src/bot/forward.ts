@@ -235,8 +235,10 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
       kind,
       user: {
         email: user.email,
-        username: user.username,
-        firstName: user.firstName,
+        // Prefer live Telegram values over the DB row, which may have been
+        // captured as NULL (e.g. via seedAdmin) and never refreshed.
+        username: ctx.from.username ?? user.username,
+        firstName: ctx.from.first_name ?? user.firstName,
         telegramId: user.telegramId,
       },
     };
