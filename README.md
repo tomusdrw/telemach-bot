@@ -18,6 +18,7 @@ full design.
    - `ADMIN_EMAIL`
    - `OPENROUTER_API_KEY` (used for both transcription and subject generation)
    - Optionally override `OPENROUTER_MODEL` (subjects) and `OPENROUTER_TRANSCRIPTION_MODEL` (voice → text)
+   - Optionally set `EVENT_MODEL` to an OpenRouter model for event extraction (defaults to `OPENROUTER_MODEL`)
    - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (must be a verified Resend domain)
 2. Create the data directory with the right ownership. The container runs as the
    `node` user (UID 1000); the bind-mount preserves host UID, so:
@@ -67,6 +68,12 @@ npm run dev
   body; original audio is not attached.
 - Photos/documents/videos/audio/animations/stickers are attached verbatim.
 - Multiple photos uploaded together bundle into one email.
+- When a message contains a date, the bot extracts the event and attaches an
+  `.ics` calendar file to the email so you can add it to your calendar in one
+  click. A 📅 reaction confirms the attachment was created.
+- `/timezone Europe/London` sets your per-user IANA timezone (default:
+  `Europe/Warsaw`). Run `/timezone` with no argument to see the current value.
+  Affects how calendar invite times are interpreted and displayed.
 
 ## Admin commands
 
