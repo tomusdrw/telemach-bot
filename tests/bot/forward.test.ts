@@ -94,6 +94,20 @@ describe('forward handler', () => {
     expect(payload.attachments[0].filename).toBe('report.pdf');
   });
 
+  it('uses live ctx.from for sender label even when DB row has null username/firstName', async () => {
+    // Simulates the seedAdmin case: DB row exists with NULL username & first_name,
+    // but the Telegram update carries fresh values.
+    const repo = new UserRepo(makeTempDb());
+    repo.seedAdmin({ telegramId: 7, email: 'alice@x.com' });
+    const { deps } = makeDeps({ repo });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'hi there' }); // ctx.from has username:'alice', first_name:'Alice'
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.text).toContain('Sent by @alice');
+    expect(payload.text).not.toMatch(/user \d+/);
+  });
+
   it('subject fallback when openrouter returns null', async () => {
     const { deps } = makeDeps({
       subject: { generateSubject: vi.fn().mockResolvedValue(null) },
