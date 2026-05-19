@@ -1,10 +1,10 @@
 // tests/bot/forward.test.ts
 import { describe, expect, it, vi } from 'vitest';
-import { makeForwardHandler } from '../../src/bot/forward';
-import { UserRepo } from '../../src/db/users';
-import { FatalError } from '../../src/lib/errors';
-import { buildFakeCtx } from '../helpers/fake-ctx';
-import { makeTempDb } from '../helpers/temp-db';
+import { makeForwardHandler } from '../../src/bot/forward.js';
+import { UserRepo } from '../../src/db/users.js';
+import { FatalError } from '../../src/lib/errors.js';
+import { buildFakeCtx } from '../helpers/fake-ctx.js';
+import { makeTempDb } from '../helpers/temp-db.js';
 
 function makeDeps(overrides: Partial<any> = {}) {
   const repo = new UserRepo(makeTempDb());

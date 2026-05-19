@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MediaGroupBuffer } from '../../src/bot/media-group';
+import { MediaGroupBuffer } from '../../src/bot/media-group.js';
 
 describe('MediaGroupBuffer', () => {
   beforeEach(() => vi.useFakeTimers());

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSubjectPrompt, fallbackSubject, sanitizeSubject } from '../../src/bot/subject-prompt';
+import { buildSubjectPrompt, fallbackSubject, sanitizeSubject } from '../../src/bot/subject-prompt.js';
 
 describe('subject prompt', () => {
   it('builds a prompt that contains the body verbatim', () => {

@@ -1,5 +1,5 @@
 // src/db/users.ts
-import type { DB } from './index';
+import type { DB } from './index.js';
 
 export type UserStatus = 'PENDING_EMAIL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
 

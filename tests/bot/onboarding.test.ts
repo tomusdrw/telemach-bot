@@ -1,8 +1,8 @@
 // tests/bot/onboarding.test.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handlePlainMessage, handleRegister, handleStart } from '../../src/bot/onboarding';
-import { UserRepo } from '../../src/db/users';
-import { makeTempDb } from '../helpers/temp-db';
+import { handlePlainMessage, handleRegister, handleStart } from '../../src/bot/onboarding.js';
+import { UserRepo } from '../../src/db/users.js';
+import { makeTempDb } from '../helpers/temp-db.js';
 
 function makeCtx(opts: { from?: { id: number; username?: string; first_name?: string } } = {}) {
   return {

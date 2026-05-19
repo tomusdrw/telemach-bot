@@ -1,6 +1,6 @@
 // tests/bot/email-composer.test.ts
 import { describe, expect, it } from 'vitest';
-import { type ComposeInput, composeEmail } from '../../src/bot/email-composer';
+import { type ComposeInput, composeEmail } from '../../src/bot/email-composer.js';
 
 const base: ComposeInput = {
   fromEmail: 'bot@example.com',

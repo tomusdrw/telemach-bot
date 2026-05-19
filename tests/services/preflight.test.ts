@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { PreflightError, runPreflight } from '../../src/services/preflight';
+import { PreflightError, runPreflight } from '../../src/services/preflight.js';
 
 function makeFetch(responses: Record<string, { ok: boolean; status: number; body: unknown }>) {
   return vi.fn().mockImplementation(async (url: string) => {

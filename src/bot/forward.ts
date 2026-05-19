@@ -1,16 +1,16 @@
 // src/bot/forward.ts
 import type { Api, Context } from 'grammy';
 import type { Message } from 'grammy/types';
-import type { UserRepo } from '../db/users';
-import { FatalError, TransientError, withRetry } from '../lib/errors';
-import { logger } from '../lib/logger';
-import type { ResendSender } from '../services/resend';
-import type { SubjectClient } from '../services/subject';
-import type { TranscriptionClient } from '../services/transcription';
-import { composeEmail, type EmailAttachment } from './email-composer';
-import { MediaGroupBuffer } from './media-group';
-import { markDone, markFailed, markReceived, markWorking } from './reactions';
-import { fallbackSubject, sanitizeSubject } from './subject-prompt';
+import type { UserRepo } from '../db/users.js';
+import { FatalError, TransientError, withRetry } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
+import type { ResendSender } from '../services/resend.js';
+import type { SubjectClient } from '../services/subject.js';
+import type { TranscriptionClient } from '../services/transcription.js';
+import { composeEmail, type EmailAttachment } from './email-composer.js';
+import { MediaGroupBuffer } from './media-group.js';
+import { markDone, markFailed, markReceived, markWorking } from './reactions.js';
+import { fallbackSubject, sanitizeSubject } from './subject-prompt.js';
 
 export interface ForwardDeps {
   repo: UserRepo;

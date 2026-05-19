@@ -1,7 +1,7 @@
 // tests/bot/auth.test.ts
 import { describe, expect, it } from 'vitest';
-import { decideAction, type UserView } from '../../src/bot/auth';
-import type { UserStatus } from '../../src/db/users';
+import { decideAction, type UserView } from '../../src/bot/auth.js';
+import type { UserStatus } from '../../src/db/users.js';
 
 const mkUser = (status: UserStatus | null): UserView | null =>
   status === null ? null : { telegramId: 1, status, isAdmin: false };
