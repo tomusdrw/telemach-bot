@@ -10,6 +10,7 @@ import { makeTranscriptionClient } from '../services/transcription';
 import { makeAdminModule } from './admin';
 import { type ForwardHandler, makeForwardHandler } from './forward';
 import { handlePlainMessage, handleRegister, handleStart } from './onboarding';
+import { handleTimezoneCommand } from './timezone-cmd';
 
 export interface BuiltBot {
   bot: Bot;
@@ -62,6 +63,7 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
   bot.command('users', (ctx) => admin.handleUsersCommand(ctx));
   bot.command('revoke', (ctx) => admin.handleRevokeCommand(ctx, String(ctx.match).trim()));
   bot.command('reset', (ctx) => admin.handleResetCommand(ctx, String(ctx.match).trim()));
+  bot.command('timezone', (ctx) => handleTimezoneCommand(ctx, { repo }));
 
   bot.callbackQuery(/^(approve|reject):\d+$/, (ctx) => admin.handleCallback(ctx));
 
