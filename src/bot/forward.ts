@@ -4,12 +4,15 @@ import type { Message } from 'grammy/types';
 import type { UserRepo } from '../db/users';
 import { FatalError, TransientError, withRetry } from '../lib/errors';
 import { logger } from '../lib/logger';
+import type { EventExtractionClient } from '../services/event-extraction';
 import type { ResendSender } from '../services/resend';
 import type { SubjectClient } from '../services/subject';
 import type { TranscriptionClient } from '../services/transcription';
 import { composeEmail, type EmailAttachment } from './email-composer';
+import type { EventData } from './event-prompt';
+import { buildIcs } from './ics-builder';
 import { MediaGroupBuffer } from './media-group';
-import { markDone, markFailed, markReceived, markWorking } from './reactions';
+import { markDone, markEventAttached, markFailed, markReceived, markWorking } from './reactions';
 import { fallbackSubject, sanitizeSubject } from './subject-prompt';
 
 export interface ForwardDeps {
@@ -19,6 +22,7 @@ export interface ForwardDeps {
   api: Api;
   subject: SubjectClient;
   transcription: TranscriptionClient;
+  events: EventExtractionClient;
   resend: ResendSender;
   download: (input: { api: Api; botToken: string; fileId: string }) => Promise<{
     buffer: Buffer;
@@ -94,6 +98,7 @@ function attachmentCountLabel(n: number): string {
 interface PersistedPayload {
   kind: MsgKind;
   user: { email: string; username: string | null; firstName: string | null; telegramId: number };
+  timezone: string;
 }
 
 interface WorkItem {
@@ -127,14 +132,81 @@ async function safeApiReact(api: Api, chatId: number, messageId: number, emoji: 
   }
 }
 
+async function tryOrNull<T>(fn: () => Promise<T>): Promise<T | null> {
+  try {
+    return await fn();
+  } catch (err) {
+    logger.warn({ err }, 'tryOrNull caught (degraded to null)');
+    return null;
+  }
+}
+
+function formatNowInTz(d: Date, timezone: string): string {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
+}
+
+function formatEventNote(event: EventData, timezone: string): string {
+  // To display wall-clock values verbatim regardless of the formatter's host TZ,
+  // we parse the local-naive ISO as UTC (`...Z`) and format with `timeZone: 'UTC'`.
+  // This decouples display from host environment and from the user's actual timezone
+  // (the actual TZ string is appended in parentheses for clarity in the timed case).
+  if (event.allDay) {
+    const fmtFullUtc = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'UTC',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    const fmtDayUtc = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'UTC',
+      day: 'numeric',
+      month: 'long',
+    });
+    const startDate = new Date(`${event.start}T00:00:00Z`);
+    const endDate = new Date(`${event.end}T00:00:00Z`);
+    if (event.start === event.end) {
+      return `📅 Event attached: ${event.summary}, ${fmtFullUtc.format(startDate)}`;
+    }
+    return `📅 Event attached: ${event.summary}, ${fmtDayUtc.format(startDate)}–${fmtDayUtc.format(endDate)} ${startDate.getUTCFullYear()}`;
+  }
+  const fmtFullUtc = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const fmtTimeUtc = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const startDate = new Date(`${event.start}:00Z`);
+  const endDate = new Date(`${event.end}:00Z`);
+  return `📅 Event attached: ${event.summary}, ${fmtFullUtc.format(startDate)}, ${fmtTimeUtc.format(startDate)}–${fmtTimeUtc.format(endDate)} (${timezone})`;
+}
+
 export interface ForwardHandler {
   (ctx: Context): Promise<void>;
   replayPending(): Promise<void>;
 }
 
 export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
-  async function buildAndSend(items: WorkItem[]): Promise<void> {
-    if (items.length === 0) return;
+  async function buildAndSend(items: WorkItem[]): Promise<{ eventAttached: boolean }> {
+    if (items.length === 0) return { eventAttached: false };
     const first = items[0]!;
 
     const attachments: EmailAttachment[] = [];
@@ -171,10 +243,57 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
     const body = transcribedBody ?? captions.join('\n\n');
     const subjectInput =
       body || (attachments.length > 0 ? attachmentCountLabel(attachments.length) : '(no text)');
-    const rawSubject = await deps.subject.generateSubject(subjectInput);
+
+    const userTz = first.payload.timezone;
+    const nowInTz = formatNowInTz(new Date(), userTz);
+
+    const [rawSubject, event] = await Promise.all([
+      tryOrNull(() => deps.subject.generateSubject(subjectInput)),
+      body
+        ? tryOrNull(() => deps.events.extract({ body, nowInTz, timezone: userTz }))
+        : Promise.resolve(null),
+    ]);
+
     const subject = rawSubject
       ? sanitizeSubject(rawSubject) || fallbackSubject(first.payload.user.username)
       : fallbackSubject(first.payload.user.username);
+
+    let bodyForEmail = body;
+    let eventAttached = false;
+    if (event) {
+      deps.repo.logAudit({
+        telegramId: first.telegramId,
+        chatMessageId: first.messageId,
+        event: 'event_extracted',
+        details: JSON.stringify({
+          summary: event.summary,
+          start: event.start,
+          end: event.end,
+          allDay: event.allDay,
+        }),
+      });
+      try {
+        const ics = buildIcs({
+          event,
+          timezone: userTz,
+          organizerEmail: deps.fromEmail,
+          attendeeEmail: first.payload.user.email,
+          now: new Date(),
+          chatId: first.chatId,
+          messageId: first.messageId,
+        });
+        attachments.push({
+          filename: ics.filename,
+          content: ics.content,
+          contentType: ics.contentType,
+        });
+        const note = formatEventNote(event, userTz);
+        bodyForEmail = body ? `${body}\n\n${note}` : note;
+        eventAttached = true;
+      } catch (err) {
+        logger.error({ err }, 'ics-builder failed; email will send without .ics');
+      }
+    }
 
     const payload = composeEmail({
       fromEmail: deps.fromEmail,
@@ -183,7 +302,7 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
       firstName: first.payload.user.firstName,
       telegramId: first.payload.user.telegramId,
       subject,
-      body,
+      body: bodyForEmail,
       attachments,
       sentAt: new Date(),
     });
@@ -202,13 +321,35 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
         details: groupDetails,
       });
     }
+
+    if (eventAttached && event) {
+      deps.repo.logAudit({
+        telegramId: first.telegramId,
+        chatMessageId: first.messageId,
+        event: 'event_attached',
+        details: JSON.stringify({
+          summary: event.summary,
+          start: event.start,
+          end: event.end,
+          allDay: event.allDay,
+        }),
+      });
+    }
+
+    return { eventAttached };
   }
 
   async function processGroup(groupId: string, items: WorkItem[]): Promise<void> {
     try {
       for (const it of items) await reactWorking(it, deps.api);
-      await buildAndSend(items);
+      const result = await buildAndSend(items);
       for (const it of items) await reactDone(it, deps.api);
+      if (result.eventAttached) {
+        for (const it of items) {
+          if (it.ctx) await markEventAttached(it.ctx);
+          else await safeApiReact(deps.api, it.chatId, it.messageId, '📅');
+        }
+      }
     } catch (err) {
       const cls =
         err instanceof TransientError
@@ -260,6 +401,7 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
         firstName: user.firstName,
         telegramId: user.telegramId,
       },
+      timezone: user.timezone,
     };
     const item: WorkItem = {
       ctx,
@@ -283,8 +425,9 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
 
     try {
       await markWorking(ctx);
-      await buildAndSend([item]);
+      const result = await buildAndSend([item]);
       await markDone(ctx);
+      if (result.eventAttached) await markEventAttached(ctx);
     } catch (err) {
       const cls =
         err instanceof TransientError
@@ -312,6 +455,7 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
       for (const r of rows) {
         try {
           const payload = JSON.parse(r.payloadJson) as PersistedPayload;
+          if (typeof payload.timezone !== 'string') payload.timezone = 'Europe/Warsaw';
           items.push({
             ctx: null,
             chatId: r.chatId,

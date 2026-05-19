@@ -3,6 +3,7 @@ import { Bot, type Context } from 'grammy';
 import type { Config } from '../config';
 import type { UserRepo } from '../db/users';
 import { logger } from '../lib/logger';
+import { makeEventExtractionClient } from '../services/event-extraction';
 import { defaultResendClient, makeResendClient } from '../services/resend';
 import { makeSubjectClient } from '../services/subject';
 import { downloadTelegramFile } from '../services/telegram-files';
@@ -28,6 +29,10 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
     apiKey: config.openrouterApiKey,
     model: config.openrouterModel,
   });
+  const events = makeEventExtractionClient({
+    apiKey: config.openrouterApiKey,
+    model: config.eventModel,
+  });
   const resend = makeResendClient(defaultResendClient(config.resendApiKey));
 
   const admin = makeAdminModule({
@@ -43,6 +48,7 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
     api: bot.api,
     subject,
     transcription,
+    events,
     resend,
     download: ({ api, botToken, fileId }) => downloadTelegramFile({ api, botToken, fileId }),
     mediaGroupFlushMs: config.mediaGroupFlushMs,
