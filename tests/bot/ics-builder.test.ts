@@ -67,6 +67,8 @@ describe('buildIcs', () => {
     expect(ics).toContain('Europe/Warsaw');
     expect(ics).toContain('BEGIN:VTIMEZONE');
     expect(ics).toContain('END:VTIMEZONE');
+    expect(ics).toContain('DTSTART;TZID=Europe/Warsaw:20260521T141000');
+    expect(ics).toContain('DTEND;TZID=Europe/Warsaw:20260521T151000');
   });
 
   it('escapes commas, semicolons, newlines, backslashes in SUMMARY', () => {
@@ -77,7 +79,7 @@ describe('buildIcs', () => {
 
   it('omits LOCATION when location is null', () => {
     const ics = build({ location: null }).content.toString('utf8');
-    expect(ics).not.toContain('LOCATION:');
+    expect(ics).not.toMatch(/^LOCATION:/m);
   });
 
   it('includes LOCATION when present', () => {

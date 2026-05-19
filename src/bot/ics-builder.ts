@@ -20,34 +20,22 @@ export interface IcsOutput {
   contentType: string;
 }
 
-function parseLocalNaive(iso: string): Date {
-  // Build a Date whose UTC components equal the local wall-clock values.
-  // ical-generator will render them with the correct TZID when timezone is set.
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/.exec(iso);
-  if (!m) throw new Error(`invalid local-naive ISO: ${iso}`);
-  const [, y, mo, d, h, mi] = m;
-  return new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h ?? '0'), Number(mi ?? '0')));
+function parseAllDayDate(iso: string): Date {
+  // YYYY-MM-DD → Date at 00:00:00 LOCAL time.
+  // ical-generator calls getDate()/getMonth()/getFullYear() (local-time methods) when
+  // formatting VALUE=DATE properties with a timezone set on the calendar, so we must
+  // store the wall-clock date in local components to be host-TZ independent.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) throw new Error(`invalid all-day date: ${iso}`);
+  const [, y, mo, d] = m;
+  return new Date(Number(y), Number(mo) - 1, Number(d));
 }
 
 function addOneDay(d: Date): Date {
+  // Use local-time setDate so the day arithmetic matches parseAllDayDate's local construction.
   const r = new Date(d.getTime());
-  r.setUTCDate(r.getUTCDate() + 1);
+  r.setDate(r.getDate() + 1);
   return r;
-}
-
-/**
- * Wrap the @touch4it/ical-timezones generator to strip the non-standard
- * X-LIC-LOCATION property (a libical extension). Its presence causes the
- * substring "LOCATION:" to appear in the VTIMEZONE block, which would
- * confuse any assertion that checks for the absence of an event LOCATION.
- */
-function vtimezoneGenerator(timezone: string): string | null {
-  const raw = getVtimezoneComponent(timezone);
-  if (raw === null) return null;
-  return raw
-    .split('\n')
-    .filter((line) => !line.startsWith('X-LIC-LOCATION:'))
-    .join('\n');
 }
 
 function stableUid(input: IcsInput): string {
@@ -60,27 +48,40 @@ export function buildIcs(input: IcsInput): IcsOutput {
   const cal = ical({
     prodId: { company: 'telemach-bot', product: 'telemach-bot', language: 'EN' },
     method: ICalCalendarMethod.PUBLISH,
-    timezone: { name: input.timezone, generator: vtimezoneGenerator },
+    timezone: { name: input.timezone, generator: getVtimezoneComponent },
   });
 
-  const startWall = parseLocalNaive(input.event.start);
-  let endWall = parseLocalNaive(input.event.end);
   if (input.event.allDay) {
-    // Inclusive (contract) → exclusive (RFC 5545): add one day.
-    endWall = addOneDay(endWall);
-  }
+    const startDate = parseAllDayDate(input.event.start);
+    const endDateInclusive = parseAllDayDate(input.event.end);
+    const endDateExclusive = addOneDay(endDateInclusive);
 
-  cal.createEvent({
-    id: stableUid(input),
-    start: startWall,
-    end: endWall,
-    allDay: input.event.allDay,
-    summary: input.event.summary,
-    description: input.event.description ?? undefined,
-    location: input.event.location ?? undefined,
-    stamp: input.now,
-    timezone: input.event.allDay ? undefined : input.timezone,
-  });
+    cal.createEvent({
+      id: stableUid(input),
+      start: startDate,
+      end: endDateExclusive,
+      allDay: true,
+      summary: input.event.summary,
+      description: input.event.description ?? undefined,
+      location: input.event.location ?? undefined,
+      stamp: input.now,
+      timezone: undefined,
+    });
+  } else {
+    // Pass ISO strings directly. `new Date('YYYY-MM-DDTHH:mm')` is parsed as LOCAL time
+    // in JS, so ical-generator's local-time accessors yield the original wall clock.
+    cal.createEvent({
+      id: stableUid(input),
+      start: input.event.start,
+      end: input.event.end,
+      allDay: false,
+      summary: input.event.summary,
+      description: input.event.description ?? undefined,
+      location: input.event.location ?? undefined,
+      stamp: input.now,
+      timezone: input.timezone,
+    });
+  }
 
   // ical-generator does not append a trailing CRLF; we add one so every
   // logical line (including the final END:VCALENDAR) ends with \r\n.
