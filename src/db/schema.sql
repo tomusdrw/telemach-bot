@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   status        TEXT NOT NULL
                  CHECK (status IN ('PENDING_EMAIL','PENDING_APPROVAL','APPROVED','REJECTED')),
   is_admin      INTEGER NOT NULL DEFAULT 0,
+  timezone      TEXT NOT NULL DEFAULT 'Europe/Warsaw',
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
 );

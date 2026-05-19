@@ -12,5 +12,16 @@ export function openDatabase(path: string): DB {
   db.pragma('foreign_keys = ON');
   const schema = readFileSync(resolve(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
+  ensureUsersTimezoneColumn(db);
   return db;
+}
+
+interface ColInfo {
+  name: string;
+}
+
+function ensureUsersTimezoneColumn(db: DB): void {
+  const cols = db.prepare<[], ColInfo>(`PRAGMA table_info('users')`).all();
+  if (cols.some((c) => c.name === 'timezone')) return;
+  db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT NOT NULL DEFAULT 'Europe/Warsaw'`);
 }

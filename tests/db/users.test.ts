@@ -69,4 +69,20 @@ describe('UserRepo', () => {
     const rows = db.prepare(`SELECT event FROM audit_log WHERE telegram_id = ? ORDER BY id`).all(1);
     expect(rows.map((r: any) => r.event)).toEqual(['received', 'emailed']);
   });
+
+  it('defaults timezone to Europe/Warsaw on insert', () => {
+    repo.upsertNew({ telegramId: 1, username: 'a', firstName: 'A' });
+    expect(repo.findById(1)?.timezone).toBe('Europe/Warsaw');
+  });
+
+  it('updateTimezone changes the timezone', () => {
+    repo.upsertNew({ telegramId: 1, username: 'a', firstName: 'A' });
+    repo.updateTimezone(1, 'America/New_York');
+    expect(repo.findById(1)?.timezone).toBe('America/New_York');
+  });
+
+  it('seedAdmin row has default timezone Europe/Warsaw', () => {
+    repo.seedAdmin({ telegramId: 99, email: 'admin@x.com' });
+    expect(repo.findById(99)?.timezone).toBe('Europe/Warsaw');
+  });
 });
