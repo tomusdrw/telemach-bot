@@ -35,4 +35,11 @@ describe('reactions', () => {
     const ctx = { react: vi.fn().mockRejectedValue(new Error('msg deleted')) };
     await expect(markDone(ctx as any)).resolves.toBeUndefined();
   });
+
+  it('markEventAttached sets 📅', async () => {
+    const ctx = fakeCtx();
+    const { markEventAttached } = await import('../../src/bot/reactions');
+    await markEventAttached(ctx as any);
+    expect(ctx._react).toHaveBeenCalledWith('📅');
+  });
 });
