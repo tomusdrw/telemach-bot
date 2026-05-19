@@ -189,13 +189,19 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
     });
     await withRetry(() => deps.resend.send(payload), { delaysMs: deps.retryDelays });
 
-    deps.repo.logAudit({
-      telegramId: first.telegramId,
-      chatMessageId: first.messageId,
-      event: 'emailed',
-      details:
-        items.length > 1 ? JSON.stringify({ group: items.length, attachments: attachments.length }) : null,
-    });
+    // One audit row per message so per-message_id lookups never lose a hit.
+    // For groups, every row's `details` carries the group size + total
+    // attachments so the operator can see "this was part of an N-item group".
+    const groupDetails =
+      items.length > 1 ? JSON.stringify({ group: items.length, attachments: attachments.length }) : null;
+    for (const it of items) {
+      deps.repo.logAudit({
+        telegramId: it.telegramId,
+        chatMessageId: it.messageId,
+        event: 'emailed',
+        details: groupDetails,
+      });
+    }
   }
 
   async function processGroup(groupId: string, items: WorkItem[]): Promise<void> {
@@ -204,8 +210,23 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
       await buildAndSend(items);
       for (const it of items) await reactDone(it, deps.api);
     } catch (err) {
-      logger.error({ err, groupId }, 'media-group flush failed');
-      for (const it of items) await reactFailed(it, deps.api);
+      const cls =
+        err instanceof TransientError
+          ? 'TransientError'
+          : err instanceof FatalError
+            ? 'FatalError'
+            : 'Unknown';
+      logger.error({ err, groupId, cls }, 'media-group flush failed');
+      const details = JSON.stringify({ class: cls, message: (err as Error)?.message, groupId });
+      for (const it of items) {
+        await reactFailed(it, deps.api);
+        deps.repo.logAudit({
+          telegramId: it.telegramId,
+          chatMessageId: it.messageId,
+          event: 'error',
+          details,
+        });
+      }
     } finally {
       deps.repo.deleteMediaGroupRows(groupId);
     }

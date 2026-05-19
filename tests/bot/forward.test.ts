@@ -136,6 +136,74 @@ describe('forward handler', () => {
     expect(ctx.react.mock.calls.map((c) => c[0])).toEqual(['👀', '✍', '💩']);
   });
 
+  it('media group writes one `emailed` audit row per item with group details', async () => {
+    const { deps } = makeDeps();
+    const handler = makeForwardHandler(deps as any);
+    const ctxs = [
+      buildFakeCtx({
+        message_id: 5001,
+        media_group_id: 'audit-grp',
+        photo: [{ file_id: 'p1', file_unique_id: '1', width: 800, height: 800 }] as any,
+      }),
+      buildFakeCtx({
+        message_id: 5002,
+        media_group_id: 'audit-grp',
+        photo: [{ file_id: 'p2', file_unique_id: '2', width: 800, height: 800 }] as any,
+      }),
+    ];
+    for (const c of ctxs) await handler(c as any);
+    await vi.waitFor(() => expect(deps.resend.send).toHaveBeenCalled());
+
+    const rows = (deps.repo as any).db
+      .prepare(
+        `SELECT chat_message_id, event, details FROM audit_log WHERE event = 'emailed' ORDER BY chat_message_id`,
+      )
+      .all();
+    expect(rows.map((r: any) => r.chat_message_id)).toEqual([5001, 5002]);
+    for (const r of rows) {
+      const detail = JSON.parse(r.details);
+      expect(detail.group).toBe(2);
+      expect(detail.attachments).toBe(2);
+    }
+  });
+
+  it('media group flush failure writes one `error` audit row per item', async () => {
+    const { deps } = makeDeps({
+      resend: { send: vi.fn().mockRejectedValue(new FatalError('boom', { provider: 'resend' })) },
+    });
+    const handler = makeForwardHandler(deps as any);
+    const ctxs = [
+      buildFakeCtx({
+        message_id: 6001,
+        media_group_id: 'err-grp',
+        photo: [{ file_id: 'p1', file_unique_id: '1', width: 800, height: 800 }] as any,
+      }),
+      buildFakeCtx({
+        message_id: 6002,
+        media_group_id: 'err-grp',
+        photo: [{ file_id: 'p2', file_unique_id: '2', width: 800, height: 800 }] as any,
+      }),
+    ];
+    for (const c of ctxs) await handler(c as any);
+    await vi.waitFor(() => {
+      for (const c of ctxs) {
+        expect(c.react.mock.calls.some((call) => call[0] === '💩')).toBe(true);
+      }
+    });
+
+    const errs = (deps.repo as any).db
+      .prepare(
+        `SELECT chat_message_id, details FROM audit_log WHERE event = 'error' ORDER BY chat_message_id`,
+      )
+      .all();
+    expect(errs.map((r: any) => r.chat_message_id)).toEqual([6001, 6002]);
+    for (const r of errs) {
+      const d = JSON.parse(r.details);
+      expect(d.class).toBe('FatalError');
+      expect(d.groupId).toBe('err-grp');
+    }
+  });
+
   it('media group: combines multiple messages into one email', async () => {
     const { deps } = makeDeps();
     const handler = makeForwardHandler(deps as any);
