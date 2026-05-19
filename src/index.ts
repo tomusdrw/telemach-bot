@@ -31,6 +31,13 @@ async function main(): Promise<void> {
   const stop = async (signal: string) => {
     logger.info({ signal }, 'stopping bot');
     await bot.stop();
+    // Drain in-flight media groups so their flush callbacks don't fire after
+    // the DB is closed and so the next start doesn't have to replay them.
+    try {
+      await forward.drain();
+    } catch (err) {
+      logger.warn({ err }, 'drain on shutdown failed');
+    }
     db.close();
     process.exit(0);
   };

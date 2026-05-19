@@ -64,4 +64,32 @@ describe('MediaGroupBuffer', () => {
     expect(onFlush).toHaveBeenCalledTimes(2);
     expect(onFlush).toHaveBeenNthCalledWith(2, 'g1', [{ id: 2 }]);
   });
+
+  it('flush() drains every group synchronously and clears timers', async () => {
+    const onFlush = vi.fn();
+    const buf = new MediaGroupBuffer<{ id: number }>(50, onFlush);
+
+    buf.add('g1', { id: 1 });
+    buf.add('g1', { id: 2 });
+    buf.add('g2', { id: 99 });
+
+    await buf.flush();
+
+    expect(onFlush).toHaveBeenCalledTimes(2);
+    expect(onFlush).toHaveBeenCalledWith('g1', [{ id: 1 }, { id: 2 }]);
+    expect(onFlush).toHaveBeenCalledWith('g2', [{ id: 99 }]);
+
+    // Advancing timers past the debounce window after flush should NOT
+    // re-fire onFlush (proves the timers were cleared).
+    vi.advanceTimersByTime(200);
+    await Promise.resolve();
+    expect(onFlush).toHaveBeenCalledTimes(2);
+  });
+
+  it('flush() on an empty buffer is a no-op', async () => {
+    const onFlush = vi.fn();
+    const buf = new MediaGroupBuffer<{ id: number }>(50, onFlush);
+    await buf.flush();
+    expect(onFlush).not.toHaveBeenCalled();
+  });
 });
