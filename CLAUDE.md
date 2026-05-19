@@ -54,8 +54,8 @@ Service wrappers map provider errors to one of these. The forward handler wraps 
 
 ## Known type-safety compromises
 
-- **`src/services/resend.ts:18`**: `(resend.emails.send as any)(...)`. The Resend v3 SDK overloads were noisy and the wrapper is fully verified by behavior tests. **Do not silently "fix"** this without checking that the actual Resend payload shape is preserved.
 - **`tests/**` uses `ctx as any`** to satisfy minimal-ctx interfaces. Production code does not need this — grammy's `Context` is structurally assignable to `MinimalCtx` (onboarding), `AdminCallbackCtx` (admin), and `ReactCtx` (reactions, after we narrowed it to the 4 emojis we use).
+- **`src/bot/forward.ts` `safeApiReact`** casts the emoji to `any` because grammy's reaction emoji union is narrower than our 4-emoji set. Behaviorally safe since we only ever pass one of those 4.
 
 ## Running
 
