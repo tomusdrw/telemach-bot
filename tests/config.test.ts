@@ -47,4 +47,21 @@ describe('parseConfig', () => {
     const cfg = parseConfig({ ...baseEnv, OPENROUTER_TRANSCRIPTION_MODEL: 'some/other-stt' });
     expect(cfg.openrouterTranscriptionModel).toBe('some/other-stt');
   });
+
+  it('EVENT_MODEL defaults to OPENROUTER_MODEL when unset', () => {
+    const cfg = parseConfig({
+      ...baseEnv,
+      OPENROUTER_MODEL: 'special/model',
+    });
+    expect(cfg.eventModel).toBe('special/model');
+  });
+
+  it('EVENT_MODEL is used when set', () => {
+    const cfg = parseConfig({
+      ...baseEnv,
+      OPENROUTER_MODEL: 'subject/m',
+      EVENT_MODEL: 'event/m',
+    });
+    expect(cfg.eventModel).toBe('event/m');
+  });
 });

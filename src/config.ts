@@ -8,6 +8,7 @@ const schema = z.object({
   OPENROUTER_API_KEY: z.string().min(1),
   OPENROUTER_MODEL: z.string().default('google/gemma-3-4b-it'),
   OPENROUTER_TRANSCRIPTION_MODEL: z.string().default('openai/whisper-large-v3'),
+  EVENT_MODEL: z.string().optional(),
 
   RESEND_API_KEY: z.string().min(1),
   RESEND_FROM_EMAIL: z.string().email(),
@@ -24,6 +25,7 @@ export interface Config {
   openrouterApiKey: string;
   openrouterModel: string;
   openrouterTranscriptionModel: string;
+  eventModel: string;
   resendApiKey: string;
   resendFromEmail: string;
   dbPath: string;
@@ -45,6 +47,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     openrouterApiKey: e.OPENROUTER_API_KEY,
     openrouterModel: e.OPENROUTER_MODEL,
     openrouterTranscriptionModel: e.OPENROUTER_TRANSCRIPTION_MODEL,
+    eventModel: e.EVENT_MODEL ?? e.OPENROUTER_MODEL,
     resendApiKey: e.RESEND_API_KEY,
     resendFromEmail: e.RESEND_FROM_EMAIL,
     dbPath: e.DB_PATH,
