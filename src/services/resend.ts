@@ -39,6 +39,7 @@ export function makeResendClient(resend: Resend): ResendSender {
           attachments: p.attachments.map((a) => ({
             filename: a.filename,
             content: a.content,
+            ...(a.contentType ? { contentType: a.contentType } : {}),
           })),
         });
         if (result.error) {
