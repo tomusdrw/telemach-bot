@@ -130,6 +130,8 @@ async function safeApiReact(api: Api, chatId: number, messageId: number, emoji: 
 export interface ForwardHandler {
   (ctx: Context): Promise<void>;
   replayPending(): Promise<void>;
+  /** Flush any buffered media groups synchronously. Use on graceful shutdown. */
+  drain(): Promise<void>;
 }
 
 export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
@@ -302,6 +304,8 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
       });
     }
   };
+
+  handler.drain = (): Promise<void> => buffer.flush();
 
   handler.replayPending = async (): Promise<void> => {
     const groups = deps.repo.listAllPendingMediaGroups();

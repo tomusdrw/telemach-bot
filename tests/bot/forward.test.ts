@@ -372,4 +372,33 @@ describe('forward handler', () => {
     await handler.replayPending();
     expect(deps.resend.send).not.toHaveBeenCalled();
   });
+
+  it('drain() flushes buffered media groups immediately', async () => {
+    // Long debounce window so the timer doesn't fire on its own.
+    const { deps, repo } = makeDeps({ mediaGroupFlushMs: 60_000 });
+    const handler = makeForwardHandler(deps as any);
+    const ctxs = [
+      buildFakeCtx({
+        media_group_id: 'drain-grp',
+        photo: [{ file_id: 'p1', file_unique_id: '1', width: 800, height: 800 }] as any,
+      }),
+      buildFakeCtx({
+        media_group_id: 'drain-grp',
+        photo: [{ file_id: 'p2', file_unique_id: '2', width: 800, height: 800 }] as any,
+      }),
+    ];
+    for (const c of ctxs) await handler(c as any);
+    // Buffer hasn't flushed yet — timer is way in the future.
+    expect(deps.resend.send).not.toHaveBeenCalled();
+    expect(repo.listAllPendingMediaGroups()).toHaveLength(1);
+
+    await handler.drain();
+
+    expect(deps.resend.send).toHaveBeenCalledTimes(1);
+    expect(repo.listAllPendingMediaGroups()).toHaveLength(0);
+    for (const c of ctxs) {
+      const emojis = c.react.mock.calls.map((call) => call[0]);
+      expect(emojis).toEqual(['👀', '✍', '👍']);
+    }
+  });
 });
