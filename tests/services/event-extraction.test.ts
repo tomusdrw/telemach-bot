@@ -1,6 +1,6 @@
 // tests/services/event-extraction.test.ts
 import { describe, expect, it, vi } from 'vitest';
-import { makeEventExtractionClient } from '../../src/services/event-extraction';
+import { makeEventExtractionClient } from '../../src/services/event-extraction.js';
 
 function mockFetch(body: unknown, status = 200) {
   return vi.fn().mockResolvedValue({

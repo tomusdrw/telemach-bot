@@ -1,8 +1,8 @@
 // tests/db/migration.test.ts
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { ensureUsersTimezoneColumn } from '../../src/db/index';
-import { UserRepo } from '../../src/db/users';
+import { ensureUsersTimezoneColumn } from '../../src/db/index.js';
+import { UserRepo } from '../../src/db/users.js';
 
 const LEGACY_USERS_DDL = `
 CREATE TABLE users (

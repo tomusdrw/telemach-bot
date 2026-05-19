@@ -1,5 +1,5 @@
 // src/bot/timezone-cmd.ts
-import type { UserRepo } from '../db/users';
+import type { UserRepo } from '../db/users.js';
 
 export interface TimezoneCmdCtx {
   from?: { id: number };

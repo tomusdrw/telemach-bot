@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { buildSubjectPrompt } from '../bot/subject-prompt';
-import { logger } from '../lib/logger';
+import { buildSubjectPrompt } from '../bot/subject-prompt.js';
+import { logger } from '../lib/logger.js';
 
 export interface SubjectClient {
   generateSubject(body: string): Promise<string | null>;

@@ -1,7 +1,7 @@
 // tests/bot/ics-builder.test.ts
 import { describe, expect, it } from 'vitest';
-import type { EventData } from '../../src/bot/event-prompt';
-import { buildIcs } from '../../src/bot/ics-builder';
+import type { EventData } from '../../src/bot/event-prompt.js';
+import { buildIcs } from '../../src/bot/ics-builder.js';
 
 const now = new Date('2026-05-19T09:00:00Z');
 

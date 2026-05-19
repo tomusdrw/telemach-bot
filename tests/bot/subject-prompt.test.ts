@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSubjectPrompt, fallbackSubject, sanitizeSubject } from '../../src/bot/subject-prompt';
+import { buildSubjectPrompt, fallbackSubject, sanitizeSubject } from '../../src/bot/subject-prompt.js';
 
 describe('subject prompt', () => {
   it('builds a prompt that contains the body verbatim', () => {
@@ -7,6 +7,11 @@ describe('subject prompt', () => {
     expect(p).toContain('hello world');
     expect(p).toMatch(/concise/i);
     expect(p).toMatch(/max 80 chars/i);
+  });
+
+  it('instructs the model to use the same language as the body', () => {
+    const p = buildSubjectPrompt('cześć świecie');
+    expect(p).toMatch(/same language/i);
   });
 
   it('sanitizes: trims, strips wrapping quotes, removes trailing punctuation', () => {

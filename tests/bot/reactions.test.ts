@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { markDone, markFailed, markReceived, markWorking } from '../../src/bot/reactions';
+import { markDone, markFailed, markReceived, markWorking } from '../../src/bot/reactions.js';
 
 function fakeCtx() {
   const react = vi.fn().mockResolvedValue(undefined);

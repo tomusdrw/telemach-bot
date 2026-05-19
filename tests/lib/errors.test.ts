@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FatalError, TransientError, withRetry } from '../../src/lib/errors';
+import { FatalError, TransientError, withRetry } from '../../src/lib/errors.js';
 
 describe('errors', () => {
   it('TransientError and FatalError are distinct named classes', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { makeSubjectClient } from '../../src/services/subject';
+import { makeSubjectClient } from '../../src/services/subject.js';
 
 function mockFetch(body: any, status = 200) {
   return vi.fn().mockResolvedValue({

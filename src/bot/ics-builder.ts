@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { getVtimezoneComponent } from '@touch4it/ical-timezones';
 import ical, { ICalCalendarMethod } from 'ical-generator';
-import type { EventData } from './event-prompt';
+import type { EventData } from './event-prompt.js';
 
 export interface IcsInput {
   event: EventData;

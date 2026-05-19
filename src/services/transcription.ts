@@ -1,6 +1,6 @@
 // src/services/transcription.ts
 import { z } from 'zod';
-import { FatalError, TransientError } from '../lib/errors';
+import { FatalError, TransientError } from '../lib/errors.js';
 
 export interface TranscriptionClient {
   transcribe(input: { audio: Buffer; filename: string }): Promise<string>;

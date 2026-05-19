@@ -1,6 +1,6 @@
 // tests/bot/event-prompt.test.ts
 import { describe, expect, it } from 'vitest';
-import { buildEventPrompt, parseEventResponse } from '../../src/bot/event-prompt';
+import { buildEventPrompt, parseEventResponse } from '../../src/bot/event-prompt.js';
 
 describe('buildEventPrompt', () => {
   it('includes timezone and nowInTz verbatim', () => {

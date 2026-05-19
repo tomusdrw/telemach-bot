@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FatalError, TransientError } from '../../src/lib/errors';
-import { makeTranscriptionClient } from '../../src/services/transcription';
+import { FatalError, TransientError } from '../../src/lib/errors.js';
+import { makeTranscriptionClient } from '../../src/services/transcription.js';
 
 function mockFetch(status: number, body: unknown) {
   return vi.fn().mockResolvedValue({

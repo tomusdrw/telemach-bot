@@ -37,4 +37,18 @@ export class MediaGroupBuffer<T> {
       void this.onFlush(groupId, entry.items);
     }, this.debounceMs);
   }
+
+  /**
+   * Cancel all pending timers and fire onFlush for each group synchronously.
+   * Intended for graceful shutdown — drain in-flight groups so they don't
+   * fire after the surrounding resources (DB) are closed.
+   */
+  async flush(): Promise<void> {
+    const entries = Array.from(this.groups.entries());
+    this.groups.clear();
+    for (const [, entry] of entries) {
+      clearTimeout(entry.timer);
+    }
+    await Promise.all(entries.map(([groupId, entry]) => this.onFlush(groupId, entry.items)));
+  }
 }

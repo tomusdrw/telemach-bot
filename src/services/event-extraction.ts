@@ -1,7 +1,7 @@
 // src/services/event-extraction.ts
 import { z } from 'zod';
-import { buildEventPrompt, type EventData, parseEventResponse } from '../bot/event-prompt';
-import { logger } from '../lib/logger';
+import { buildEventPrompt, type EventData, parseEventResponse } from '../bot/event-prompt.js';
+import { logger } from '../lib/logger.js';
 
 export interface EventExtractionClient {
   extract(input: { body: string; nowInTz: string; timezone: string }): Promise<EventData | null>;

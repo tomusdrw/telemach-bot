@@ -1,10 +1,13 @@
 // src/db/index.ts
 
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 
 export type DB = Database.Database;
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export function openDatabase(path: string): DB {
   const db = new Database(path);

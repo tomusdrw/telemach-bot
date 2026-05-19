@@ -1,10 +1,10 @@
 // tests/bot/forward.test.ts
 import { describe, expect, it, vi } from 'vitest';
-import { makeForwardHandler } from '../../src/bot/forward';
-import { UserRepo } from '../../src/db/users';
-import { FatalError } from '../../src/lib/errors';
-import { buildFakeCtx } from '../helpers/fake-ctx';
-import { makeTempDb } from '../helpers/temp-db';
+import { makeForwardHandler } from '../../src/bot/forward.js';
+import { UserRepo } from '../../src/db/users.js';
+import { FatalError } from '../../src/lib/errors.js';
+import { buildFakeCtx } from '../helpers/fake-ctx.js';
+import { makeTempDb } from '../helpers/temp-db.js';
 
 function makeDeps(overrides: Partial<any> = {}) {
   const db = makeTempDb();
@@ -94,6 +94,20 @@ describe('forward handler', () => {
     await handler(ctx as any);
     const payload = deps.resend.send.mock.calls[0][0];
     expect(payload.attachments[0].filename).toBe('report.pdf');
+  });
+
+  it('uses live ctx.from for sender label even when DB row has null username/firstName', async () => {
+    // Simulates the seedAdmin case: DB row exists with NULL username & first_name,
+    // but the Telegram update carries fresh values.
+    const repo = new UserRepo(makeTempDb());
+    repo.seedAdmin({ telegramId: 7, email: 'alice@x.com' });
+    const { deps } = makeDeps({ repo });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'hi there' }); // ctx.from has username:'alice', first_name:'Alice'
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.text).toContain('Sent by @alice');
+    expect(payload.text).not.toMatch(/user \d+/);
   });
 
   it('subject fallback when openrouter returns null', async () => {
@@ -512,5 +526,34 @@ describe('forward handler', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(extract).toHaveBeenCalledWith(expect.objectContaining({ timezone: 'Europe/Warsaw' }));
+  });
+
+  it('drain() flushes buffered media groups immediately', async () => {
+    // Long debounce window so the timer doesn't fire on its own.
+    const { deps, repo } = makeDeps({ mediaGroupFlushMs: 60_000 });
+    const handler = makeForwardHandler(deps as any);
+    const ctxs = [
+      buildFakeCtx({
+        media_group_id: 'drain-grp',
+        photo: [{ file_id: 'p1', file_unique_id: '1', width: 800, height: 800 }] as any,
+      }),
+      buildFakeCtx({
+        media_group_id: 'drain-grp',
+        photo: [{ file_id: 'p2', file_unique_id: '2', width: 800, height: 800 }] as any,
+      }),
+    ];
+    for (const c of ctxs) await handler(c as any);
+    // Buffer hasn't flushed yet — timer is way in the future.
+    expect(deps.resend.send).not.toHaveBeenCalled();
+    expect(repo.listAllPendingMediaGroups()).toHaveLength(1);
+
+    await handler.drain();
+
+    expect(deps.resend.send).toHaveBeenCalledTimes(1);
+    expect(repo.listAllPendingMediaGroups()).toHaveLength(0);
+    for (const c of ctxs) {
+      const emojis = c.react.mock.calls.map((call) => call[0]);
+      expect(emojis).toEqual(['👀', '✍', '👍']);
+    }
   });
 });

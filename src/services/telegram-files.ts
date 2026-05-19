@@ -1,5 +1,5 @@
 import type { Api } from 'grammy';
-import { FatalError, TransientError } from '../lib/errors';
+import { FatalError, TransientError } from '../lib/errors.js';
 
 export const TELEGRAM_FILE_MAX_BYTES = 20 * 1024 * 1024;
 

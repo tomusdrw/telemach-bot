@@ -2,6 +2,7 @@
   "name": "telemach-bot",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "engines": {
     "node": ">=22"
   },
@@ -23,7 +24,7 @@
     "grammy": "^1.30.0",
     "ical-generator": "^10.2.0",
     "pino": "^9.4.0",
-    "resend": "^3.5.0",
+    "resend": "^6.12.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {

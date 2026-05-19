@@ -1,19 +1,19 @@
 // src/bot/forward.ts
 import type { Api, Context } from 'grammy';
 import type { Message } from 'grammy/types';
-import type { UserRepo } from '../db/users';
-import { FatalError, TransientError, withRetry } from '../lib/errors';
-import { logger } from '../lib/logger';
-import type { EventExtractionClient } from '../services/event-extraction';
-import type { ResendSender } from '../services/resend';
-import type { SubjectClient } from '../services/subject';
-import type { TranscriptionClient } from '../services/transcription';
-import { composeEmail, type EmailAttachment } from './email-composer';
-import type { EventData } from './event-prompt';
-import { buildIcs } from './ics-builder';
-import { MediaGroupBuffer } from './media-group';
-import { markDone, markEventAttached, markFailed, markReceived, markWorking } from './reactions';
-import { fallbackSubject, sanitizeSubject } from './subject-prompt';
+import type { UserRepo } from '../db/users.js';
+import { FatalError, TransientError, withRetry } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
+import type { EventExtractionClient } from '../services/event-extraction.js';
+import type { ResendSender } from '../services/resend.js';
+import type { SubjectClient } from '../services/subject.js';
+import type { TranscriptionClient } from '../services/transcription.js';
+import { composeEmail, type EmailAttachment } from './email-composer.js';
+import type { EventData } from './event-prompt.js';
+import { buildIcs } from './ics-builder.js';
+import { MediaGroupBuffer } from './media-group.js';
+import { markDone, markEventAttached, markFailed, markReceived, markWorking } from './reactions.js';
+import { fallbackSubject, sanitizeSubject } from './subject-prompt.js';
 
 export interface ForwardDeps {
   repo: UserRepo;
@@ -204,6 +204,8 @@ function formatEventNote(event: EventData, timezone: string): string {
 export interface ForwardHandler {
   (ctx: Context): Promise<void>;
   replayPending(): Promise<void>;
+  /** Flush any buffered media groups synchronously. Use on graceful shutdown. */
+  drain(): Promise<void>;
 }
 
 export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
@@ -397,8 +399,10 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
       kind,
       user: {
         email: user.email,
-        username: user.username,
-        firstName: user.firstName,
+        // Prefer live Telegram values over the DB row, which may have been
+        // captured as NULL (e.g. via seedAdmin) and never refreshed.
+        username: ctx.from.username ?? user.username,
+        firstName: ctx.from.first_name ?? user.firstName,
         telegramId: user.telegramId,
       },
       timezone: user.timezone,
@@ -445,6 +449,8 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
       });
     }
   };
+
+  handler.drain = (): Promise<void> => buffer.flush();
 
   handler.replayPending = async (): Promise<void> => {
     const groups = deps.repo.listAllPendingMediaGroups();

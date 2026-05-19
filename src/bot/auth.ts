@@ -1,5 +1,5 @@
 // src/bot/auth.ts
-import type { UserStatus } from '../db/users';
+import type { UserStatus } from '../db/users.js';
 
 export interface UserView {
   telegramId: number;

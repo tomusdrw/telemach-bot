@@ -1,4 +1,4 @@
-import { logger } from '../lib/logger';
+import { logger } from '../lib/logger.js';
 
 // Emojis that grammy's Context.react accepts natively (subset of Telegram's reaction list).
 type NativeReactionEmoji = '👀' | '✍' | '👍' | '💩';

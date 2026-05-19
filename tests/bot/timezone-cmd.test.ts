@@ -1,9 +1,9 @@
 // tests/bot/timezone-cmd.test.ts
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleTimezoneCommand } from '../../src/bot/timezone-cmd';
-import type { DB } from '../../src/db/index';
-import { UserRepo } from '../../src/db/users';
-import { makeTempDb } from '../helpers/temp-db';
+import { handleTimezoneCommand } from '../../src/bot/timezone-cmd.js';
+import type { DB } from '../../src/db/index.js';
+import { UserRepo } from '../../src/db/users.js';
+import { makeTempDb } from '../helpers/temp-db.js';
 
 function fakeCtx(from = { id: 7 }) {
   return {
