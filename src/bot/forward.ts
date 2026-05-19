@@ -156,56 +156,49 @@ function formatNowInTz(d: Date, timezone: string): string {
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
 }
 
+// Body-note formatters. To make output host-TZ-independent we parse the local-naive
+// ISO string as UTC (`...Z`) and format with `timeZone: 'UTC'`; the user's actual
+// timezone string is appended in parentheses for the timed case.
+const FMT_FULL_UTC = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+const FMT_DAY_UTC = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  day: 'numeric',
+  month: 'long',
+});
+const FMT_DAY_MONTH_YEAR_UTC = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+const FMT_TIME_UTC = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
 function formatEventNote(event: EventData, timezone: string): string {
-  // To display wall-clock values verbatim regardless of the formatter's host TZ,
-  // we parse the local-naive ISO as UTC (`...Z`) and format with `timeZone: 'UTC'`.
-  // This decouples display from host environment and from the user's actual timezone
-  // (the actual TZ string is appended in parentheses for clarity in the timed case).
   if (event.allDay) {
-    const fmtFullUtc = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'UTC',
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-    const fmtDayUtc = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'UTC',
-      day: 'numeric',
-      month: 'long',
-    });
     const startDate = new Date(`${event.start}T00:00:00Z`);
     const endDate = new Date(`${event.end}T00:00:00Z`);
     if (event.start === event.end) {
-      return `📅 Event attached: ${event.summary}, ${fmtFullUtc.format(startDate)}`;
+      return `📅 Event attached: ${event.summary}, ${FMT_FULL_UTC.format(startDate)}`;
     }
     if (startDate.getUTCFullYear() !== endDate.getUTCFullYear()) {
-      const fmtDayMonthYear = new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'UTC',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
-      return `📅 Event attached: ${event.summary}, ${fmtDayMonthYear.format(startDate)}–${fmtDayMonthYear.format(endDate)}`;
+      return `📅 Event attached: ${event.summary}, ${FMT_DAY_MONTH_YEAR_UTC.format(startDate)}–${FMT_DAY_MONTH_YEAR_UTC.format(endDate)}`;
     }
-    return `📅 Event attached: ${event.summary}, ${fmtDayUtc.format(startDate)}–${fmtDayUtc.format(endDate)} ${startDate.getUTCFullYear()}`;
+    return `📅 Event attached: ${event.summary}, ${FMT_DAY_UTC.format(startDate)}–${FMT_DAY_UTC.format(endDate)} ${startDate.getUTCFullYear()}`;
   }
-  const fmtFullUtc = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-  const fmtTimeUtc = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
   const startDate = new Date(`${event.start}:00Z`);
   const endDate = new Date(`${event.end}:00Z`);
-  return `📅 Event attached: ${event.summary}, ${fmtFullUtc.format(startDate)}, ${fmtTimeUtc.format(startDate)}–${fmtTimeUtc.format(endDate)} (${timezone})`;
+  return `📅 Event attached: ${event.summary}, ${FMT_FULL_UTC.format(startDate)}, ${FMT_TIME_UTC.format(startDate)}–${FMT_TIME_UTC.format(endDate)} (${timezone})`;
 }
 
 export interface ForwardHandler {

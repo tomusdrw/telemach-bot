@@ -100,9 +100,9 @@ PENDING_APPROVAL ─ admin rejects ───► REJECTED        (terminal)
 <!-- Persistent media-group buffer was added; see src/bot/forward.ts replayPending() -->
 - Persistent media-group buffer was an open item, now implemented: every group item is written to `media_group_pending` on receipt and replayed on startup.
 
+If a task touches one of these, check the spec — it might explicitly be out of scope.
+
 ## v1.1 features (shipped after initial v1)
 
 - **Calendar attachment** (`src/bot/ics-builder.ts`, `src/bot/event-prompt.ts`, `src/services/event-extraction.ts`): when a message contains a date, an `.ics` file is attached to the email. Controlled by `EVENT_MODEL` env var (defaults to `OPENROUTER_MODEL`).
-- **Per-user timezone** (`/timezone` command, `src/bot/bot/index.ts`): approved users can run `/timezone Europe/London` to change their IANA timezone (default `Europe/Warsaw`). Affects calendar invite times.
-
-If a task touches one of these, check the spec — it might explicitly be out of scope.
+- **Per-user timezone** (`/timezone` command in `src/bot/timezone-cmd.ts`, wired in `src/bot/index.ts`): approved users can run `/timezone Europe/London` to change their IANA timezone (default `Europe/Warsaw`). Affects calendar invite times.
