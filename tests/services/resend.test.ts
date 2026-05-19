@@ -23,25 +23,66 @@ describe('resend service', () => {
     expect(id).toBe('re-id-1');
   });
 
-  it('maps Resend error object with retryable status to TransientError', async () => {
+  // Resend's ErrorResponse only has { name, message } — no statusCode.
+  // The wrapper maps name → status via the table mirrored from
+  // RESEND_ERROR_CODES_BY_KEY in the SDK.
+  it('maps Resend error name "application_error" (500) to TransientError', async () => {
     const fake = makeFakeResend(async () => ({
       data: null,
-      error: { name: 'x', message: 'm', statusCode: 503 },
+      error: { name: 'application_error', message: 'boom' },
     }));
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
   });
 
-  it('maps Resend error object with 4xx to FatalError', async () => {
+  it('maps Resend error name "internal_server_error" to TransientError', async () => {
     const fake = makeFakeResend(async () => ({
       data: null,
-      error: { name: 'x', message: 'm', statusCode: 400 },
+      error: { name: 'internal_server_error', message: 'oops' },
+    }));
+    const c = makeResendClient(fake as any);
+    await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
+  });
+
+  it('maps Resend error name "rate_limit_exceeded" to TransientError', async () => {
+    const fake = makeFakeResend(async () => ({
+      data: null,
+      error: { name: 'rate_limit_exceeded', message: 'rate' },
+    }));
+    const c = makeResendClient(fake as any);
+    await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
+  });
+
+  it('maps Resend error name "invalid_parameter" (422) to FatalError', async () => {
+    const fake = makeFakeResend(async () => ({
+      data: null,
+      error: { name: 'invalid_parameter', message: 'nope' },
     }));
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(FatalError);
   });
 
-  it('maps thrown 5xx errors to TransientError', async () => {
+  it('maps Resend error name "missing_api_key" (401) to FatalError', async () => {
+    const fake = makeFakeResend(async () => ({
+      data: null,
+      error: { name: 'missing_api_key', message: 'no key' },
+    }));
+    const c = makeResendClient(fake as any);
+    await expect(c.send(payload)).rejects.toBeInstanceOf(FatalError);
+  });
+
+  it('unknown error name falls through to FatalError (safer default)', async () => {
+    const fake = makeFakeResend(async () => ({
+      data: null,
+      error: { name: 'totally_new_error', message: 'who knows' },
+    }));
+    const c = makeResendClient(fake as any);
+    await expect(c.send(payload)).rejects.toBeInstanceOf(FatalError);
+  });
+
+  // Thrown-error path: SDK errors with a `statusCode` property still flow
+  // through the existing classify() helper.
+  it('maps thrown 5xx errors (with statusCode) to TransientError', async () => {
     const err: any = new Error('boom');
     err.statusCode = 500;
     const fake = makeFakeResend(async () => {
@@ -51,16 +92,7 @@ describe('resend service', () => {
     await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
   });
 
-  it('maps Resend error object with 429 to TransientError', async () => {
-    const fake = makeFakeResend(async () => ({
-      data: null,
-      error: { name: 'x', message: 'rate', statusCode: 429 },
-    }));
-    const c = makeResendClient(fake as any);
-    await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
-  });
-
-  it('maps thrown 429 errors to TransientError', async () => {
+  it('maps thrown 429 errors (with statusCode) to TransientError', async () => {
     const err: any = new Error('rate');
     err.statusCode = 429;
     const fake = makeFakeResend(async () => {
