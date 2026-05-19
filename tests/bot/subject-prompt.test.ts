@@ -9,6 +9,11 @@ describe('subject prompt', () => {
     expect(p).toMatch(/max 80 chars/i);
   });
 
+  it('instructs the model to use the same language as the body', () => {
+    const p = buildSubjectPrompt('cześć świecie');
+    expect(p).toMatch(/same language/i);
+  });
+
   it('sanitizes: trims, strips wrapping quotes, removes trailing punctuation', () => {
     expect(sanitizeSubject('  "Hello world."  ')).toBe('Hello world');
     expect(sanitizeSubject(`'It's working!'`)).toBe(`It's working`);

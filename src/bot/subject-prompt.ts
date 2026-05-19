@@ -1,5 +1,5 @@
 export function buildSubjectPrompt(body: string): string {
-  return `Generate a concise, descriptive email subject (max 80 chars, no quotes, no trailing punctuation) for the following message body. Reply with the subject only, no preamble.
+  return `Generate a concise, descriptive email subject (max 80 chars, no quotes, no trailing punctuation) for the following message body. Use the same language as the BODY. Reply with the subject only, no preamble.
 
 BODY:
 ${body}`;
