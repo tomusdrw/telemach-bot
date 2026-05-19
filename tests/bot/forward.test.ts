@@ -462,6 +462,29 @@ describe('forward handler', () => {
     expect(payload.attachments.some((a: any) => a.filename === 'event.ics')).toBe(true);
   });
 
+  it('formatEventNote: year-crossing all-day range shows both years', async () => {
+    const event = {
+      summary: 'New Year Span',
+      allDay: true,
+      start: '2026-12-30',
+      end: '2027-01-02',
+      location: null,
+      description: null,
+    };
+    const events = { extract: vi.fn().mockResolvedValue(event) };
+    const { deps } = makeDeps({ events });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'some message with dates' });
+    await handler(ctx as any);
+
+    const payload = deps.resend.send.mock.calls[0][0];
+    const note: string = payload.text;
+    expect(note).toContain('2026');
+    expect(note).toContain('2027');
+    expect(note).toContain('30 December');
+    expect(note).toContain('2 January');
+  });
+
   it('uses the timezone captured at receive-time even if user changes it later (media-group)', async () => {
     const event = {
       summary: 'X',

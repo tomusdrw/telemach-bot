@@ -179,6 +179,15 @@ function formatEventNote(event: EventData, timezone: string): string {
     if (event.start === event.end) {
       return `📅 Event attached: ${event.summary}, ${fmtFullUtc.format(startDate)}`;
     }
+    if (startDate.getUTCFullYear() !== endDate.getUTCFullYear()) {
+      const fmtDayMonthYear = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'UTC',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      return `📅 Event attached: ${event.summary}, ${fmtDayMonthYear.format(startDate)}–${fmtDayMonthYear.format(endDate)}`;
+    }
     return `📅 Event attached: ${event.summary}, ${fmtDayUtc.format(startDate)}–${fmtDayUtc.format(endDate)} ${startDate.getUTCFullYear()}`;
   }
   const fmtFullUtc = new Intl.DateTimeFormat('en-GB', {
@@ -276,8 +285,6 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
         const ics = buildIcs({
           event,
           timezone: userTz,
-          organizerEmail: deps.fromEmail,
-          attendeeEmail: first.payload.user.email,
           now: new Date(),
           chatId: first.chatId,
           messageId: first.messageId,
