@@ -5,22 +5,10 @@ import { parseConfig } from './config.js';
 import { openDatabase } from './db/index.js';
 import { UserRepo } from './db/users.js';
 import { configureLogger, logger } from './lib/logger.js';
-import { runPreflight } from './services/preflight.js';
 
 async function main(): Promise<void> {
   const config = parseConfig(process.env as Record<string, string | undefined>);
   configureLogger({ level: config.logLevel });
-
-  if (process.env.SKIP_PREFLIGHT !== 'true') {
-    await runPreflight({
-      openrouterApiKey: config.openrouterApiKey,
-      resendApiKey: config.resendApiKey,
-      resendFromEmail: config.resendFromEmail,
-    });
-    logger.info('preflight checks passed');
-  } else {
-    logger.warn('SKIP_PREFLIGHT=true; provider credentials not verified');
-  }
 
   const db = openDatabase(config.dbPath);
   const repo = new UserRepo(db);
