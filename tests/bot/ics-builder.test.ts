@@ -18,8 +18,6 @@ function build(overrides: Partial<EventData> = {}, opts: Partial<Parameters<type
   return buildIcs({
     event,
     timezone: 'Europe/Warsaw',
-    organizerEmail: 'bot@example.com',
-    attendeeEmail: 'me@example.com',
     now,
     chatId: 7,
     messageId: 1001,
@@ -105,6 +103,15 @@ describe('buildIcs', () => {
   it('UID ends with @telemach-bot', () => {
     const ics = build().content.toString('utf8');
     expect(ics).toMatch(/UID:[^\r\n]+@telemach-bot/);
+  });
+
+  it('rejects malformed all-day dates (Feb 30, April 31)', () => {
+    expect(() => build({ allDay: true, start: '2026-02-30', end: '2026-02-30' })).toThrow();
+    expect(() => build({ allDay: true, start: '2026-04-31', end: '2026-04-31' })).toThrow();
+  });
+
+  it('rejects malformed timed dates (Feb 30T10:00)', () => {
+    expect(() => build({ allDay: false, start: '2026-02-30T10:00', end: '2026-02-30T11:00' })).toThrow();
   });
 
   it('long SUMMARY is folded at 75 octets per RFC 5545', () => {

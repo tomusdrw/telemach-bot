@@ -7,8 +7,6 @@ import type { EventData } from './event-prompt';
 export interface IcsInput {
   event: EventData;
   timezone: string;
-  organizerEmail: string;
-  attendeeEmail: string;
   now: Date;
   chatId: number;
   messageId: number;
@@ -20,13 +18,31 @@ export interface IcsOutput {
   contentType: string;
 }
 
+function validateLocalNaive(iso: string, kind: 'date' | 'datetime'): void {
+  const re = kind === 'date' ? /^(\d{4})-(\d{2})-(\d{2})$/ : /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+  const m = re.exec(iso);
+  if (!m) throw new Error(`invalid ${kind}: ${iso}`);
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  const date = new Date(y, mo, d);
+  if (date.getFullYear() !== y || date.getMonth() !== mo || date.getDate() !== d) {
+    throw new Error(`invalid ${kind} (rollover): ${iso}`);
+  }
+  if (kind === 'datetime') {
+    const h = Number(m[4]);
+    const mi = Number(m[5]);
+    if (h > 23 || mi > 59) throw new Error(`invalid ${kind} (out of range): ${iso}`);
+  }
+}
+
 function parseAllDayDate(iso: string): Date {
   // YYYY-MM-DD → Date at 00:00:00 LOCAL time.
   // ical-generator calls getDate()/getMonth()/getFullYear() (local-time methods) when
   // formatting VALUE=DATE properties with a timezone set on the calendar, so we must
   // store the wall-clock date in local components to be host-TZ independent.
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) throw new Error(`invalid all-day date: ${iso}`);
+  // Caller must have already called validateLocalNaive(iso, 'date').
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)!;
   const [, y, mo, d] = m;
   return new Date(Number(y), Number(mo) - 1, Number(d));
 }
@@ -45,6 +61,14 @@ function stableUid(input: IcsInput): string {
 }
 
 export function buildIcs(input: IcsInput): IcsOutput {
+  if (input.event.allDay) {
+    validateLocalNaive(input.event.start, 'date');
+    validateLocalNaive(input.event.end, 'date');
+  } else {
+    validateLocalNaive(input.event.start, 'datetime');
+    validateLocalNaive(input.event.end, 'datetime');
+  }
+
   const cal = ical({
     prodId: { company: 'telemach-bot', product: 'telemach-bot', language: 'EN' },
     method: ICalCalendarMethod.PUBLISH,
