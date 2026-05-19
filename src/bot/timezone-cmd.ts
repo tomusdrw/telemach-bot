@@ -3,7 +3,6 @@ import type { UserRepo } from '../db/users';
 
 export interface TimezoneCmdCtx {
   from?: { id: number };
-  match: string | RegExpMatchArray;
   reply(text: string): Promise<unknown>;
 }
 
@@ -11,38 +10,41 @@ export interface TimezoneCmdDeps {
   repo: UserRepo;
 }
 
-function isValidTimezone(tz: string): boolean {
+function canonicalizeTimezone(tz: string): string | null {
   try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz });
-    return true;
+    return new Intl.DateTimeFormat('en-US', { timeZone: tz }).resolvedOptions().timeZone;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function handleTimezoneCommand(ctx: TimezoneCmdCtx, deps: TimezoneCmdDeps): Promise<void> {
+export async function handleTimezoneCommand(
+  ctx: TimezoneCmdCtx,
+  arg: string,
+  deps: TimezoneCmdDeps,
+): Promise<void> {
   if (!ctx.from) return;
   const user = deps.repo.findById(ctx.from.id);
   if (!user || user.status !== 'APPROVED') return;
 
-  const arg = String(ctx.match ?? '').trim();
-  if (arg === '') {
+  if (arg.trim() === '') {
     await ctx.reply(`Your timezone: ${user.timezone}`);
     return;
   }
 
-  if (!isValidTimezone(arg)) {
+  const canonical = canonicalizeTimezone(arg);
+  if (canonical === null) {
     await ctx.reply("Unknown timezone. Use an IANA name like 'Europe/Warsaw' or 'America/New_York'.");
     return;
   }
 
   const from = user.timezone;
-  deps.repo.updateTimezone(user.telegramId, arg);
+  deps.repo.updateTimezone(user.telegramId, canonical);
   deps.repo.logAudit({
     telegramId: user.telegramId,
     chatMessageId: null,
     event: 'timezone_changed',
-    details: JSON.stringify({ from, to: arg }),
+    details: JSON.stringify({ from, to: canonical }),
   });
-  await ctx.reply(`Timezone updated: ${arg}`);
+  await ctx.reply(`Timezone updated: ${canonical}`);
 }

@@ -5,10 +5,9 @@ import type { DB } from '../../src/db/index';
 import { UserRepo } from '../../src/db/users';
 import { makeTempDb } from '../helpers/temp-db';
 
-function fakeCtx(arg = '', from = { id: 7 }) {
+function fakeCtx(from = { id: 7 }) {
   return {
     from,
-    match: arg,
     reply: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -26,14 +25,14 @@ describe('/timezone command', () => {
   });
 
   it('no arg replies with current timezone', async () => {
-    const ctx = fakeCtx('');
-    await handleTimezoneCommand(ctx as any, { repo });
+    const ctx = fakeCtx();
+    await handleTimezoneCommand(ctx as any, '', { repo });
     expect(ctx.reply).toHaveBeenCalledWith('Your timezone: Europe/Warsaw');
   });
 
   it('valid IANA arg updates DB and replies success', async () => {
-    const ctx = fakeCtx('America/New_York');
-    await handleTimezoneCommand(ctx as any, { repo });
+    const ctx = fakeCtx();
+    await handleTimezoneCommand(ctx as any, 'America/New_York', { repo });
     expect(repo.findById(7)?.timezone).toBe('America/New_York');
     expect(ctx.reply).toHaveBeenCalledWith('Timezone updated: America/New_York');
     const audit = db
@@ -45,8 +44,8 @@ describe('/timezone command', () => {
   });
 
   it('invalid IANA arg replies with hint, no DB write', async () => {
-    const ctx = fakeCtx('Foo/Bar');
-    await handleTimezoneCommand(ctx as any, { repo });
+    const ctx = fakeCtx();
+    await handleTimezoneCommand(ctx as any, 'Foo/Bar', { repo });
     expect(repo.findById(7)?.timezone).toBe('Europe/Warsaw');
     expect(ctx.reply).toHaveBeenCalledWith(
       "Unknown timezone. Use an IANA name like 'Europe/Warsaw' or 'America/New_York'.",
@@ -55,15 +54,22 @@ describe('/timezone command', () => {
 
   it('non-approved user: no reply, no write', async () => {
     repo.setStatus(7, 'PENDING_APPROVAL');
-    const ctx = fakeCtx('America/New_York');
-    await handleTimezoneCommand(ctx as any, { repo });
+    const ctx = fakeCtx();
+    await handleTimezoneCommand(ctx as any, 'America/New_York', { repo });
     expect(ctx.reply).not.toHaveBeenCalled();
     expect(repo.findById(7)?.timezone).toBe('Europe/Warsaw');
   });
 
   it('unknown user: no reply, no write', async () => {
-    const ctx = fakeCtx('America/New_York', { id: 999 });
-    await handleTimezoneCommand(ctx as any, { repo });
+    const ctx = fakeCtx({ id: 999 });
+    await handleTimezoneCommand(ctx as any, 'America/New_York', { repo });
     expect(ctx.reply).not.toHaveBeenCalled();
+  });
+
+  it('normalizes non-canonical IANA casing on store and in reply', async () => {
+    const ctx = fakeCtx();
+    await handleTimezoneCommand(ctx as any, 'europe/london', { repo });
+    expect(repo.findById(7)?.timezone).toBe('Europe/London');
+    expect(ctx.reply).toHaveBeenCalledWith('Timezone updated: Europe/London');
   });
 });
