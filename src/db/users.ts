@@ -10,6 +10,7 @@ export interface User {
   email: string | null;
   status: UserStatus;
   isAdmin: boolean;
+  timezone: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -23,7 +24,14 @@ export interface UpsertNewInput {
 export interface AuditInput {
   telegramId: number;
   chatMessageId: number | null;
-  event: 'received' | 'transcribed' | 'emailed' | 'error';
+  event:
+    | 'received'
+    | 'transcribed'
+    | 'emailed'
+    | 'error'
+    | 'event_extracted'
+    | 'event_attached'
+    | 'timezone_changed';
   details: string | null;
 }
 
@@ -44,6 +52,7 @@ interface UserRow {
   email: string | null;
   status: UserStatus;
   is_admin: number;
+  timezone: string;
   created_at: number;
   updated_at: number;
 }
@@ -55,6 +64,7 @@ const rowToUser = (r: UserRow): User => ({
   email: r.email,
   status: r.status,
   isAdmin: r.is_admin === 1,
+  timezone: r.timezone,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -99,6 +109,13 @@ export class UserRepo {
     this.db
       .prepare(`UPDATE users SET status = ?, updated_at = ? WHERE telegram_id = ?`)
       .run(status, t, telegramId);
+  }
+
+  updateTimezone(telegramId: number, timezone: string): void {
+    const t = now();
+    this.db
+      .prepare(`UPDATE users SET timezone = ?, updated_at = ? WHERE telegram_id = ?`)
+      .run(timezone, t, telegramId);
   }
 
   listUsers(opts: { limit: number } = { limit: 50 }): User[] {

@@ -3,6 +3,7 @@ import { Bot, type Context } from 'grammy';
 import type { Config } from '../config.js';
 import type { UserRepo } from '../db/users.js';
 import { logger } from '../lib/logger.js';
+import { makeEventExtractionClient } from '../services/event-extraction.js';
 import { defaultResendClient, makeResendClient } from '../services/resend.js';
 import { makeSubjectClient } from '../services/subject.js';
 import { downloadTelegramFile } from '../services/telegram-files.js';
@@ -10,6 +11,7 @@ import { makeTranscriptionClient } from '../services/transcription.js';
 import { makeAdminModule } from './admin.js';
 import { type ForwardHandler, makeForwardHandler } from './forward.js';
 import { handlePlainMessage, handleRegister, handleStart } from './onboarding.js';
+import { handleTimezoneCommand } from './timezone-cmd.js';
 
 export interface BuiltBot {
   bot: Bot;
@@ -27,6 +29,10 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
     apiKey: config.openrouterApiKey,
     model: config.openrouterModel,
   });
+  const events = makeEventExtractionClient({
+    apiKey: config.openrouterApiKey,
+    model: config.eventModel,
+  });
   const resend = makeResendClient(defaultResendClient(config.resendApiKey));
 
   const admin = makeAdminModule({
@@ -42,6 +48,7 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
     api: bot.api,
     subject,
     transcription,
+    events,
     resend,
     download: ({ api, botToken, fileId }) => downloadTelegramFile({ api, botToken, fileId }),
     mediaGroupFlushMs: config.mediaGroupFlushMs,
@@ -62,6 +69,7 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
   bot.command('users', (ctx) => admin.handleUsersCommand(ctx));
   bot.command('revoke', (ctx) => admin.handleRevokeCommand(ctx, String(ctx.match).trim()));
   bot.command('reset', (ctx) => admin.handleResetCommand(ctx, String(ctx.match).trim()));
+  bot.command('timezone', (ctx) => handleTimezoneCommand(ctx, String(ctx.match).trim(), { repo }));
 
   bot.callbackQuery(/^(approve|reject):\d+$/, (ctx) => admin.handleCallback(ctx));
 

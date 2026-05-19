@@ -18,9 +18,11 @@
     "format": "biome format --write src tests"
   },
   "dependencies": {
+    "@touch4it/ical-timezones": "^1.9.0",
     "better-sqlite3": "^12.10.0",
     "dotenv": "^16.4.5",
     "grammy": "^1.30.0",
+    "ical-generator": "^10.2.0",
     "pino": "^9.4.0",
     "resend": "^6.12.3",
     "zod": "^3.23.8"

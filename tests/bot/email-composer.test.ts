@@ -65,4 +65,16 @@ describe('composeEmail', () => {
     const p = composeEmail({ ...base, attachments: att });
     expect(p.attachments).toEqual(att);
   });
+
+  it('passes contentType through on attachments when present', () => {
+    const att = [
+      {
+        filename: 'event.ics',
+        content: Buffer.from('BEGIN:VCALENDAR'),
+        contentType: 'text/calendar; method=PUBLISH; charset=UTF-8',
+      },
+    ];
+    const p = composeEmail({ ...base, attachments: att });
+    expect(p.attachments[0]?.contentType).toBe('text/calendar; method=PUBLISH; charset=UTF-8');
+  });
 });

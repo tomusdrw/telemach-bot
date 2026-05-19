@@ -7,7 +7,8 @@ import { buildFakeCtx } from '../helpers/fake-ctx.js';
 import { makeTempDb } from '../helpers/temp-db.js';
 
 function makeDeps(overrides: Partial<any> = {}) {
-  const repo = new UserRepo(makeTempDb());
+  const db = makeTempDb();
+  const repo = new UserRepo(db);
   repo.upsertNew({ telegramId: 7, username: 'alice', firstName: 'Alice' });
   repo.setEmail(7, 'alice@x.com');
   repo.setStatus(7, 'APPROVED');
@@ -16,6 +17,7 @@ function makeDeps(overrides: Partial<any> = {}) {
     fromEmail: 'bot@x.com',
     subject: { generateSubject: vi.fn().mockResolvedValue('Lunch plans') },
     transcription: { transcribe: vi.fn().mockResolvedValue('hello voice') },
+    events: { extract: vi.fn().mockResolvedValue(null) },
     resend: { send: vi.fn().mockResolvedValue('re-1') },
     download: vi.fn().mockResolvedValue({
       buffer: Buffer.from([1, 2, 3]),
@@ -28,7 +30,7 @@ function makeDeps(overrides: Partial<any> = {}) {
     botToken: 'TOK',
     ...overrides,
   };
-  return { deps, repo };
+  return { deps, repo, db };
 }
 
 describe('forward handler', () => {
@@ -385,6 +387,145 @@ describe('forward handler', () => {
     const handler = makeForwardHandler(deps as any);
     await handler.replayPending();
     expect(deps.resend.send).not.toHaveBeenCalled();
+  });
+
+  it('attaches .ics and appends body note when extraction returns an event', async () => {
+    const event = {
+      summary: 'Spotkanie',
+      allDay: false,
+      start: '2026-05-21T14:10',
+      end: '2026-05-21T15:10',
+      location: null,
+      description: null,
+    };
+    const events = { extract: vi.fn().mockResolvedValue(event) };
+    const { deps, db } = makeDeps({ events });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'Spotkanie w czwartek o 14:10' });
+    await handler(ctx as any);
+
+    const payload = deps.resend.send.mock.calls[0][0];
+    const ics = payload.attachments.find((a: any) => a.filename === 'event.ics');
+    expect(ics).toBeTruthy();
+    expect(ics.contentType).toBe('text/calendar; method=PUBLISH; charset=UTF-8');
+    expect(payload.text).toContain('📅 Event attached:');
+    expect(payload.text).toContain('Spotkanie');
+
+    const audit = db.prepare(`SELECT event FROM audit_log WHERE telegram_id = ? ORDER BY id`).all(7) as {
+      event: string;
+    }[];
+    const types = audit.map((r) => r.event);
+    expect(types).toContain('event_extracted');
+    expect(types).toContain('event_attached');
+
+    const reactionsCalled = ctx.react.mock.calls.map((c) => c[0]);
+    expect(reactionsCalled).toContain('📅');
+    expect(reactionsCalled).toContain('👍');
+  });
+
+  it('no .ics, no body note, no event audit when extraction returns null', async () => {
+    const events = { extract: vi.fn().mockResolvedValue(null) };
+    const { deps, db } = makeDeps({ events });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'random no-date message' });
+    await handler(ctx as any);
+
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.attachments).toEqual([]);
+    expect(payload.text).not.toContain('📅');
+
+    const types = (
+      db.prepare(`SELECT event FROM audit_log WHERE telegram_id = ?`).all(7) as { event: string }[]
+    ).map((r) => r.event);
+    expect(types).not.toContain('event_extracted');
+    expect(types).not.toContain('event_attached');
+  });
+
+  it('extraction that throws degrades to no .ics, email still sends', async () => {
+    const events = { extract: vi.fn().mockRejectedValue(new Error('boom')) };
+    const { deps } = makeDeps({ events });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'anything' });
+    await handler(ctx as any);
+
+    expect(deps.resend.send).toHaveBeenCalledTimes(1);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.attachments).toEqual([]);
+  });
+
+  it('voice transcript body is scanned for events', async () => {
+    const event = {
+      summary: 'Turnus',
+      allDay: true,
+      start: '2026-05-14',
+      end: '2026-05-16',
+      location: null,
+      description: null,
+    };
+    const events = { extract: vi.fn().mockResolvedValue(event) };
+    const { deps } = makeDeps({ events });
+    deps.transcription.transcribe.mockResolvedValue('Turnus 14.05 - 16.05');
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({
+      voice: { file_id: 'vf', file_unique_id: 'u', duration: 3 } as any,
+    });
+    await handler(ctx as any);
+
+    expect(events.extract).toHaveBeenCalledWith(expect.objectContaining({ body: 'Turnus 14.05 - 16.05' }));
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.attachments.some((a: any) => a.filename === 'event.ics')).toBe(true);
+  });
+
+  it('formatEventNote: year-crossing all-day range shows both years', async () => {
+    const event = {
+      summary: 'New Year Span',
+      allDay: true,
+      start: '2026-12-30',
+      end: '2027-01-02',
+      location: null,
+      description: null,
+    };
+    const events = { extract: vi.fn().mockResolvedValue(event) };
+    const { deps } = makeDeps({ events });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'some message with dates' });
+    await handler(ctx as any);
+
+    const payload = deps.resend.send.mock.calls[0][0];
+    const note: string = payload.text;
+    expect(note).toContain('2026');
+    expect(note).toContain('2027');
+    expect(note).toContain('30 December');
+    expect(note).toContain('2 January');
+  });
+
+  it('uses the timezone captured at receive-time even if user changes it later (media-group)', async () => {
+    const event = {
+      summary: 'X',
+      allDay: true,
+      start: '2026-05-14',
+      end: '2026-05-14',
+      location: null,
+      description: null,
+    };
+    const extract = vi.fn().mockResolvedValue(event);
+    const { deps, repo } = makeDeps({
+      events: { extract },
+      mediaGroupFlushMs: 5,
+    });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({
+      text: '',
+      caption: 'Turnus 14.05',
+      media_group_id: 'g1',
+      photo: [{ file_id: 'p1', file_unique_id: '1', width: 10, height: 10, file_size: 10 }] as any,
+    });
+    await handler(ctx as any);
+    // change timezone after enqueue
+    repo.updateTimezone(7, 'America/New_York');
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(extract).toHaveBeenCalledWith(expect.objectContaining({ timezone: 'Europe/Warsaw' }));
   });
 
   it('drain() flushes buffered media groups immediately', async () => {

@@ -82,4 +82,29 @@ describe('resend service', () => {
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
   });
+
+  it('forwards attachment contentType to Resend SDK when present', async () => {
+    const send = vi.fn().mockResolvedValue({ data: { id: 'r-1' }, error: null });
+    const sender = makeResendClient({ emails: { send } } as any);
+    await sender.send({
+      from: 'a@x.com',
+      to: 'b@x.com',
+      subject: 's',
+      text: 't',
+      html: '<p>t</p>',
+      attachments: [
+        {
+          filename: 'event.ics',
+          content: Buffer.from('x'),
+          contentType: 'text/calendar; method=PUBLISH; charset=UTF-8',
+        },
+      ],
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    const sentPayload = send.mock.calls[0][0];
+    expect(sentPayload.attachments[0]).toMatchObject({
+      filename: 'event.ics',
+      contentType: 'text/calendar; method=PUBLISH; charset=UTF-8',
+    });
+  });
 });
