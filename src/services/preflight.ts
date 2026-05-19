@@ -9,7 +9,7 @@
 // where you want to start without hitting the network).
 
 import { z } from 'zod';
-import { logger } from '../lib/logger';
+import { logger } from '../lib/logger.js';
 
 export interface PreflightOpts {
   openrouterApiKey: string;

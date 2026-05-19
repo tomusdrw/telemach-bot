@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FatalError, TransientError } from '../../src/lib/errors';
-import { makeResendClient } from '../../src/services/resend';
+import { FatalError, TransientError } from '../../src/lib/errors.js';
+import { makeResendClient } from '../../src/services/resend.js';
 
 function makeFakeResend(impl: any) {
   return { emails: { send: vi.fn().mockImplementation(impl) } };
@@ -23,58 +23,39 @@ describe('resend service', () => {
     expect(id).toBe('re-id-1');
   });
 
-  // Resend's ErrorResponse only has { name, message } — no statusCode.
-  // The wrapper maps name → status via the table mirrored from
-  // RESEND_ERROR_CODES_BY_KEY in the SDK.
-  it('maps Resend error name "application_error" (500) to TransientError', async () => {
+  // v6 ErrorResponse: { message, name, statusCode: number | null }
+  // The wrapper reads statusCode directly.
+  it('maps Resend error with 5xx statusCode to TransientError', async () => {
     const fake = makeFakeResend(async () => ({
       data: null,
-      error: { name: 'application_error', message: 'boom' },
+      error: { name: 'application_error', message: 'boom', statusCode: 500 },
     }));
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
   });
 
-  it('maps Resend error name "internal_server_error" to TransientError', async () => {
+  it('maps Resend error with 429 statusCode to TransientError', async () => {
     const fake = makeFakeResend(async () => ({
       data: null,
-      error: { name: 'internal_server_error', message: 'oops' },
+      error: { name: 'rate_limit_exceeded', message: 'rate', statusCode: 429 },
     }));
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
   });
 
-  it('maps Resend error name "rate_limit_exceeded" to TransientError', async () => {
+  it('maps Resend error with 4xx statusCode to FatalError', async () => {
     const fake = makeFakeResend(async () => ({
       data: null,
-      error: { name: 'rate_limit_exceeded', message: 'rate' },
-    }));
-    const c = makeResendClient(fake as any);
-    await expect(c.send(payload)).rejects.toBeInstanceOf(TransientError);
-  });
-
-  it('maps Resend error name "invalid_parameter" (422) to FatalError', async () => {
-    const fake = makeFakeResend(async () => ({
-      data: null,
-      error: { name: 'invalid_parameter', message: 'nope' },
+      error: { name: 'invalid_parameter', message: 'nope', statusCode: 422 },
     }));
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(FatalError);
   });
 
-  it('maps Resend error name "missing_api_key" (401) to FatalError', async () => {
+  it('maps Resend error with null statusCode to FatalError (safer default)', async () => {
     const fake = makeFakeResend(async () => ({
       data: null,
-      error: { name: 'missing_api_key', message: 'no key' },
-    }));
-    const c = makeResendClient(fake as any);
-    await expect(c.send(payload)).rejects.toBeInstanceOf(FatalError);
-  });
-
-  it('unknown error name falls through to FatalError (safer default)', async () => {
-    const fake = makeFakeResend(async () => ({
-      data: null,
-      error: { name: 'totally_new_error', message: 'who knows' },
+      error: { name: 'validation_error', message: 'who knows', statusCode: null },
     }));
     const c = makeResendClient(fake as any);
     await expect(c.send(payload)).rejects.toBeInstanceOf(FatalError);

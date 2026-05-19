@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseConfig } from '../src/config';
+import { parseConfig } from '../src/config.js';
 
 const baseEnv = {
   TELEGRAM_BOT_TOKEN: 'token',

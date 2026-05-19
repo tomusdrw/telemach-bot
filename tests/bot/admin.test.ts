@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeAdminModule } from '../../src/bot/admin';
-import { UserRepo } from '../../src/db/users';
-import { makeTempDb } from '../helpers/temp-db';
+import { makeAdminModule } from '../../src/bot/admin.js';
+import { UserRepo } from '../../src/db/users.js';
+import { makeTempDb } from '../helpers/temp-db.js';
 
 function fakeApi() {
   return {

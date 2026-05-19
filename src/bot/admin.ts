@@ -1,6 +1,6 @@
 import type { Api } from 'grammy';
-import type { UserRepo } from '../db/users';
-import { logger } from '../lib/logger';
+import type { UserRepo } from '../db/users.js';
+import { logger } from '../lib/logger.js';
 
 export interface AdminModuleOpts {
   api: Api;

@@ -1,11 +1,11 @@
 // src/index.ts
 import 'dotenv/config';
-import { buildBot } from './bot/index';
-import { parseConfig } from './config';
-import { openDatabase } from './db/index';
-import { UserRepo } from './db/users';
-import { configureLogger, logger } from './lib/logger';
-import { runPreflight } from './services/preflight';
+import { buildBot } from './bot/index.js';
+import { parseConfig } from './config.js';
+import { openDatabase } from './db/index.js';
+import { UserRepo } from './db/users.js';
+import { configureLogger, logger } from './lib/logger.js';
+import { runPreflight } from './services/preflight.js';
 
 async function main(): Promise<void> {
   const config = parseConfig(process.env as Record<string, string | undefined>);

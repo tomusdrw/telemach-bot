@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { configureLogger, logger } from '../../src/lib/logger';
+import { configureLogger, logger } from '../../src/lib/logger.js';
 
 describe('logger', () => {
   it('defaults to info level before configureLogger is called', () => {

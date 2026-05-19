@@ -1,6 +1,6 @@
-import { type CreateEmailOptions, type ErrorResponse, Resend } from 'resend';
-import type { EmailPayload } from '../bot/email-composer';
-import { FatalError, TransientError } from '../lib/errors';
+import { type CreateEmailOptions, Resend } from 'resend';
+import type { EmailPayload } from '../bot/email-composer.js';
+import { FatalError, TransientError } from '../lib/errors.js';
 
 export interface ResendSender {
   send(payload: EmailPayload): Promise<string>; // returns Resend message id
@@ -11,33 +11,9 @@ interface ProviderError {
   message?: string;
 }
 
-// Mirrors RESEND_ERROR_CODES_BY_KEY in the SDK (declared but not exported at
-// runtime). Kept in sync manually with `node_modules/resend/dist/index.d.ts`.
-// If the SDK adds a new code, classify() will fall through to 'fatal', which
-// is the safer default.
-const ERROR_STATUS_BY_NAME: Record<string, number> = {
-  missing_required_field: 422,
-  invalid_access: 422,
-  invalid_parameter: 422,
-  invalid_region: 422,
-  rate_limit_exceeded: 429,
-  missing_api_key: 401,
-  invalid_api_Key: 403,
-  invalid_from_address: 403,
-  validation_error: 403,
-  not_found: 404,
-  method_not_allowed: 405,
-  application_error: 500,
-  internal_server_error: 500,
-};
-
-function classify(statusCode: number | undefined): 'transient' | 'fatal' {
+function classify(statusCode: number | undefined | null): 'transient' | 'fatal' {
   if (statusCode && (statusCode === 429 || statusCode >= 500)) return 'transient';
   return 'fatal';
-}
-
-function classifyByError(err: ErrorResponse): 'transient' | 'fatal' {
-  return classify(ERROR_STATUS_BY_NAME[err.name]);
 }
 
 function asProviderError(err: unknown): ProviderError {
@@ -69,7 +45,8 @@ export function makeResendClient(resend: Resend): ResendSender {
         };
         const result = await resend.emails.send(sendPayload);
         if (result.error) {
-          const cls = classifyByError(result.error);
+          // v6: ErrorResponse has a real `statusCode: number | null` field.
+          const cls = classify(result.error.statusCode);
           const Cls = cls === 'transient' ? TransientError : FatalError;
           throw new Cls(`resend: ${result.error.message}`, {
             provider: 'resend',

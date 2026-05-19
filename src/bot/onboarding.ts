@@ -1,7 +1,7 @@
 // src/bot/onboarding.ts
 import { z } from 'zod';
-import type { UserRepo } from '../db/users';
-import { decideAction } from './auth';
+import type { UserRepo } from '../db/users.js';
+import { decideAction } from './auth.js';
 
 export interface NotifyAdminInput {
   telegramId: number;

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FatalError, TransientError } from '../../src/lib/errors';
-import { downloadTelegramFile, TELEGRAM_FILE_MAX_BYTES } from '../../src/services/telegram-files';
+import { FatalError, TransientError } from '../../src/lib/errors.js';
+import { downloadTelegramFile, TELEGRAM_FILE_MAX_BYTES } from '../../src/services/telegram-files.js';
 
 function mockFetch(status: number, body?: ArrayBuffer) {
   return vi.fn().mockResolvedValue({
