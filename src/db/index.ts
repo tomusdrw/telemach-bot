@@ -20,7 +20,7 @@ interface ColInfo {
   name: string;
 }
 
-function ensureUsersTimezoneColumn(db: DB): void {
+export function ensureUsersTimezoneColumn(db: DB): void {
   const cols = db.prepare<[], ColInfo>(`PRAGMA table_info('users')`).all();
   if (cols.some((c) => c.name === 'timezone')) return;
   db.exec(`ALTER TABLE users ADD COLUMN timezone TEXT NOT NULL DEFAULT 'Europe/Warsaw'`);
