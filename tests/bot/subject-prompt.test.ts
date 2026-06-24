@@ -9,9 +9,12 @@ describe('subject prompt', () => {
     expect(p).toMatch(/max 80 chars/i);
   });
 
-  it('instructs the model to use the same language as the body', () => {
+  it('instructs the model to match the body language and never translate', () => {
     const p = buildSubjectPrompt('cześć świecie');
     expect(p).toMatch(/same language/i);
+    // A single "use the same language" clause was not enough for small models
+    // (see #25): the rule must be explicit that the subject is NOT translated.
+    expect(p).toMatch(/translate/i);
   });
 
   it('sanitizes: trims, strips wrapping quotes, removes trailing punctuation', () => {
