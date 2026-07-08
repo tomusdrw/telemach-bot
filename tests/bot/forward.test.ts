@@ -16,6 +16,7 @@ function makeDeps(overrides: Partial<any> = {}) {
     repo,
     fromEmail: 'bot@x.com',
     subject: { generateSubject: vi.fn().mockResolvedValue('Lunch plans') },
+    expansion: { expand: vi.fn().mockResolvedValue(null) },
     transcription: { transcribe: vi.fn().mockResolvedValue('hello voice') },
     events: { extract: vi.fn().mockResolvedValue(null) },
     resend: { send: vi.fn().mockResolvedValue('re-1') },
@@ -34,10 +35,14 @@ function makeDeps(overrides: Partial<any> = {}) {
 }
 
 describe('forward handler', () => {
+  // A long message (> 80 chars) keeps the AI-generated subject.
+  const LONG_TEXT =
+    'This is a deliberately long message that comfortably exceeds the eighty character subject threshold.';
+
   it('text message: 👀 → ✍ → 👍 with Resend called', async () => {
     const { deps } = makeDeps();
     const handler = makeForwardHandler(deps as any);
-    const ctx = buildFakeCtx({ text: 'hi there' });
+    const ctx = buildFakeCtx({ text: LONG_TEXT });
     await handler(ctx as any);
     expect(ctx.react.mock.calls.map((c) => c[0])).toEqual(['👀', '✍', '👍']);
     expect(deps.resend.send).toHaveBeenCalledTimes(1);
@@ -110,12 +115,12 @@ describe('forward handler', () => {
     expect(payload.text).not.toMatch(/user \d+/);
   });
 
-  it('subject fallback when openrouter returns null', async () => {
+  it('subject fallback when openrouter returns null (long message)', async () => {
     const { deps } = makeDeps({
       subject: { generateSubject: vi.fn().mockResolvedValue(null) },
     });
     const handler = makeForwardHandler(deps as any);
-    const ctx = buildFakeCtx({ text: 'hi' });
+    const ctx = buildFakeCtx({ text: LONG_TEXT });
     await handler(ctx as any);
     const payload = deps.resend.send.mock.calls[0][0];
     expect(payload.subject).toBe('Telegram message from @alice');
@@ -526,6 +531,96 @@ describe('forward handler', () => {
     await new Promise((r) => setTimeout(r, 20));
 
     expect(extract).toHaveBeenCalledWith(expect.objectContaining({ timezone: 'Europe/Warsaw' }));
+  });
+
+  // -------- verbatim subject + body expansion ----------------------------
+
+  it('short text message: subject is the message verbatim and AI subject is not called', async () => {
+    const { deps } = makeDeps();
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'kup mleko' });
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.subject).toBe('kup mleko');
+    expect(deps.subject.generateSubject).not.toHaveBeenCalled();
+  });
+
+  it('long text message: subject uses the AI path', async () => {
+    const { deps } = makeDeps();
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: LONG_TEXT });
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.subject).toBe('Lunch plans');
+    expect(deps.subject.generateSubject).toHaveBeenCalledTimes(1);
+  });
+
+  it('appends the AI-cleaned rendition below the original with a separator', async () => {
+    const { deps } = makeDeps({
+      expansion: { expand: vi.fn().mockResolvedValue('To jest notatka, rozwinięta.') },
+    });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'notatka' });
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(deps.expansion.expand).toHaveBeenCalledWith('notatka');
+    expect(payload.text).toContain('notatka');
+    expect(payload.text).toContain('———');
+    expect(payload.text).toContain('✍️ To jest notatka, rozwinięta.');
+    // original stays above the rendition
+    expect(payload.text.indexOf('notatka')).toBeLessThan(payload.text.indexOf('✍️'));
+  });
+
+  it('does not append a rendition that only differs by case/punctuation', async () => {
+    const { deps } = makeDeps({
+      expansion: { expand: vi.fn().mockResolvedValue('Kup mleko.') },
+    });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'kup mleko' });
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(deps.expansion.expand).toHaveBeenCalled();
+    expect(payload.text).not.toContain('✍️');
+    expect(payload.text).not.toContain('———');
+  });
+
+  it('null expansion → body is the original only', async () => {
+    const { deps } = makeDeps(); // default expansion resolves null
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'notatka' });
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.text).not.toContain('✍️');
+    expect(payload.text).toContain('notatka');
+  });
+
+  it('expansion failure does not fail or delay the email', async () => {
+    const { deps } = makeDeps({
+      expansion: { expand: vi.fn().mockRejectedValue(new Error('boom')) },
+    });
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({ text: 'notatka' });
+    await handler(ctx as any);
+    expect(deps.resend.send).toHaveBeenCalledTimes(1);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.text).not.toContain('✍️');
+    expect(ctx.react.mock.calls.map((c) => c[0])).toEqual(['👀', '✍', '👍']);
+  });
+
+  it('short voice transcript: verbatim subject + expansion appended', async () => {
+    const { deps } = makeDeps({
+      expansion: { expand: vi.fn().mockResolvedValue('Kup mleko dzisiaj wieczorem.') },
+    });
+    deps.transcription.transcribe.mockResolvedValue('kup mleko');
+    const handler = makeForwardHandler(deps as any);
+    const ctx = buildFakeCtx({
+      voice: { file_id: 'vf', file_unique_id: 'u', duration: 3 } as any,
+    });
+    await handler(ctx as any);
+    const payload = deps.resend.send.mock.calls[0][0];
+    expect(payload.subject).toBe('kup mleko');
+    expect(deps.subject.generateSubject).not.toHaveBeenCalled();
+    expect(payload.text).toContain('✍️ Kup mleko dzisiaj wieczorem.');
   });
 
   it('drain() flushes buffered media groups immediately', async () => {

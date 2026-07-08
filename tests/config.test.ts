@@ -64,4 +64,18 @@ describe('parseConfig', () => {
     });
     expect(cfg.eventModel).toBe('event/m');
   });
+
+  it('EXPANSION_MODEL defaults to OPENROUTER_MODEL when unset', () => {
+    const cfg = parseConfig({ ...baseEnv, OPENROUTER_MODEL: 'special/model' });
+    expect(cfg.expansionModel).toBe('special/model');
+  });
+
+  it('EXPANSION_MODEL is used when set', () => {
+    const cfg = parseConfig({
+      ...baseEnv,
+      OPENROUTER_MODEL: 'subject/m',
+      EXPANSION_MODEL: 'expand/m',
+    });
+    expect(cfg.expansionModel).toBe('expand/m');
+  });
 });

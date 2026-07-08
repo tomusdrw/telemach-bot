@@ -4,16 +4,18 @@ import type { Message } from 'grammy/types';
 import type { UserRepo } from '../db/users.js';
 import { FatalError, TransientError, withRetry } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
+import type { BodyExpansionClient } from '../services/body-expansion.js';
 import type { EventExtractionClient } from '../services/event-extraction.js';
 import type { ResendSender } from '../services/resend.js';
 import type { SubjectClient } from '../services/subject.js';
 import type { TranscriptionClient } from '../services/transcription.js';
+import { isDuplicateRendition, sanitizeExpansion } from './body-expansion-prompt.js';
 import { composeEmail, type EmailAttachment } from './email-composer.js';
 import type { EventData } from './event-prompt.js';
 import { buildIcs } from './ics-builder.js';
 import { MediaGroupBuffer } from './media-group.js';
 import { markDone, markEventAttached, markFailed, markReceived, markWorking } from './reactions.js';
-import { fallbackSubject, sanitizeSubject } from './subject-prompt.js';
+import { fallbackSubject, isShortSubject, sanitizeSubject, verbatimSubject } from './subject-prompt.js';
 
 export interface ForwardDeps {
   repo: UserRepo;
@@ -21,6 +23,7 @@ export interface ForwardDeps {
   botToken: string;
   api: Api;
   subject: SubjectClient;
+  expansion: BodyExpansionClient;
   transcription: TranscriptionClient;
   events: EventExtractionClient;
   resend: ResendSender;
@@ -247,22 +250,36 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
     const body = transcribedBody ?? captions.join('\n\n');
     const subjectInput =
       body || (attachments.length > 0 ? attachmentCountLabel(attachments.length) : '(no text)');
+    // Short, single-line messages become the subject verbatim (no AI paraphrase).
+    const short = isShortSubject(body);
 
     const userTz = first.payload.timezone;
     const nowInTz = formatNowInTz(new Date(), userTz);
 
-    const [rawSubject, event] = await Promise.all([
-      tryOrNull(() => deps.subject.generateSubject(subjectInput)),
+    const [rawSubject, rawExpansion, event] = await Promise.all([
+      short ? Promise.resolve(null) : tryOrNull(() => deps.subject.generateSubject(subjectInput)),
+      body ? tryOrNull(() => deps.expansion.expand(body)) : Promise.resolve(null),
       body
         ? tryOrNull(() => deps.events.extract({ body, nowInTz, timezone: userTz }))
         : Promise.resolve(null),
     ]);
 
-    const subject = rawSubject
-      ? sanitizeSubject(rawSubject) || fallbackSubject(first.payload.user.username)
-      : fallbackSubject(first.payload.user.username);
+    const subject = short
+      ? verbatimSubject(body)
+      : rawSubject
+        ? sanitizeSubject(rawSubject) || fallbackSubject(first.payload.user.username)
+        : fallbackSubject(first.payload.user.username);
 
+    // Additive body: keep the user's original text, then append an AI-cleaned /
+    // expanded rendition below it (skipping a pure duplicate), then the event note.
     let bodyForEmail = body;
+    if (rawExpansion) {
+      const cleaned = sanitizeExpansion(rawExpansion);
+      if (cleaned && !isDuplicateRendition(body, cleaned)) {
+        bodyForEmail = `${bodyForEmail}\n\n———\n✍️ ${cleaned}`;
+      }
+    }
+
     let eventAttached = false;
     if (event) {
       deps.repo.logAudit({
@@ -290,7 +307,7 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
           contentType: ics.contentType,
         });
         const note = formatEventNote(event, userTz);
-        bodyForEmail = body ? `${body}\n\n${note}` : note;
+        bodyForEmail = bodyForEmail ? `${bodyForEmail}\n\n${note}` : note;
         eventAttached = true;
       } catch (err) {
         logger.error({ err }, 'ics-builder failed; email will send without .ics');
