@@ -3,6 +3,7 @@ import { Bot, type Context } from 'grammy';
 import type { Config } from '../config.js';
 import type { UserRepo } from '../db/users.js';
 import { logger } from '../lib/logger.js';
+import { makeBodyExpansionClient } from '../services/body-expansion.js';
 import { makeEventExtractionClient } from '../services/event-extraction.js';
 import { defaultResendClient, makeResendClient } from '../services/resend.js';
 import { makeSubjectClient } from '../services/subject.js';
@@ -29,6 +30,10 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
     apiKey: config.openrouterApiKey,
     model: config.openrouterModel,
   });
+  const expansion = makeBodyExpansionClient({
+    apiKey: config.openrouterApiKey,
+    model: config.expansionModel,
+  });
   const events = makeEventExtractionClient({
     apiKey: config.openrouterApiKey,
     model: config.eventModel,
@@ -47,6 +52,7 @@ export function buildBot(config: Config, repo: UserRepo): BuiltBot {
     botToken: config.telegramBotToken,
     api: bot.api,
     subject,
+    expansion,
     transcription,
     events,
     resend,

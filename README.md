@@ -18,7 +18,7 @@ full design.
    - `ADMIN_EMAIL`
    - `OPENROUTER_API_KEY` (used for both transcription and subject generation)
    - Optionally override `OPENROUTER_MODEL` (subjects) and `OPENROUTER_TRANSCRIPTION_MODEL` (voice → text)
-   - Optionally set `EVENT_MODEL` to an OpenRouter model for event extraction (defaults to `OPENROUTER_MODEL`)
+   - Optionally set `EVENT_MODEL` (event extraction) and `EXPANSION_MODEL` (body cleanup/expansion); both default to `OPENROUTER_MODEL`
    - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` (must be a verified Resend domain)
 2. Create the data directory with the right ownership. The container runs as the
    `node` user (UID 1000); the bind-mount preserves host UID, so:
@@ -62,6 +62,10 @@ npm run dev
 - `/register` → bot stores email, DMs admin with Approve/Reject buttons.
 - After approval, forwarded messages are acknowledged with reactions only:
   👀 received → ✍ working → 👍 sent (or 💩 on error).
+- A short, single-line message (≤ 80 chars) becomes the email subject verbatim;
+  longer messages get an LLM-generated subject. For every text message the LLM
+  also appends a cleaned-up/expanded rendition (typos fixed, terse notes spelled
+  out) below the original in the body; links are left untouched.
 - Voice messages are transcribed via OpenRouter's `/audio/transcriptions`
   endpoint (default model: `openai/whisper-large-v3`, override with
   `OPENROUTER_TRANSCRIPTION_MODEL`). The transcript is sent as the email

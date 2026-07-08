@@ -25,3 +25,26 @@ export function sanitizeSubject(raw: string): string {
 export function fallbackSubject(username: string | null): string {
   return username ? `Telegram message from @${username}` : 'Telegram message';
 }
+
+const SUBJECT_MAX = 80;
+
+/**
+ * A message text is "short" — and thus used verbatim as the subject — when,
+ * after trimming, it is a single non-empty line no longer than the subject cap.
+ */
+export function isShortSubject(text: string): boolean {
+  const t = text.trim();
+  if (t.length === 0) return false;
+  if (/[\r\n]/.test(t)) return false;
+  return t.length <= SUBJECT_MAX;
+}
+
+/**
+ * The literal message used as an email subject. Only trims and hard-caps at the
+ * subject length; unlike {@link sanitizeSubject} it keeps the user's exact
+ * punctuation and quotes.
+ */
+export function verbatimSubject(text: string): string {
+  const t = text.trim();
+  return t.length > SUBJECT_MAX ? t.slice(0, SUBJECT_MAX) : t;
+}

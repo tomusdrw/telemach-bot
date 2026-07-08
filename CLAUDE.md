@@ -50,7 +50,7 @@ Two error classes in `src/lib/errors.ts`:
 
 Service wrappers map provider errors to one of these. The forward handler wraps every external call with `withRetry`. If a call surfaces a non-typed error, it propagates and the top-level `try/catch` in `forward.ts` reacts with 💩 + an audit log row.
 
-**Subject generation is the exception:** `subject.generateSubject` returns `string | null` (never throws), and a null is treated as "use fallback subject." This is per spec — subject generation must not delay or fail an otherwise valid email.
+**Subject and body-expansion generation are the exception:** `subject.generateSubject` and `bodyExpansion.expand` both return `string | null` (never throw). A null subject → fallback subject; a null (or exact-duplicate) expansion → no expansion section is appended. Per spec, neither may delay or fail an otherwise valid email.
 
 ## Known type-safety compromises
 
@@ -106,3 +106,7 @@ If a task touches one of these, check the spec — it might explicitly be out of
 
 - **Calendar attachment** (`src/bot/ics-builder.ts`, `src/bot/event-prompt.ts`, `src/services/event-extraction.ts`): when a message contains a date, an `.ics` file is attached to the email. Controlled by `EVENT_MODEL` env var (defaults to `OPENROUTER_MODEL`).
 - **Per-user timezone** (`/timezone` command in `src/bot/timezone-cmd.ts`, wired in `src/bot/index.ts`): approved users can run `/timezone Europe/London` to change their IANA timezone (default `Europe/Warsaw`). Affects calendar invite times.
+
+## v1.2 features
+
+- **Verbatim subject + body expansion** (`src/bot/subject-prompt.ts` `isShortSubject`/`verbatimSubject`, `src/bot/body-expansion-prompt.ts`, `src/services/body-expansion.ts`, orchestrated in `src/bot/forward.ts`): a short single-line message (≤ 80 chars) becomes the email subject verbatim (no AI paraphrase); longer messages keep the AI subject. For every text message an LLM appends a cleaned/expanded rendition below the original in the body (additive; exact duplicates skipped; links left as-is). Controlled by `EXPANSION_MODEL` (defaults to `OPENROUTER_MODEL`). See `docs/superpowers/specs/2026-07-08-verbatim-subject-body-expansion-design.md`.
