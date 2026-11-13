@@ -25,7 +25,7 @@ export async function handleTimezoneCommand(
 ): Promise<void> {
   if (!ctx.from) return;
   const user = deps.repo.findById(ctx.from.id);
-  if (!user || user.status !== 'APPROVED') return;
+  if (user?.status !== 'APPROVED') return;
 
   if (arg.trim() === '') {
     await ctx.reply(`Your timezone: ${user.timezone}`);

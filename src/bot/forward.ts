@@ -400,7 +400,7 @@ export function makeForwardHandler(deps: ForwardDeps): ForwardHandler {
     const msg = ctx.message;
     if (!msg || !ctx.from) return;
     const user = deps.repo.findById(ctx.from.id);
-    if (!user || user.status !== 'APPROVED' || !user.email) return;
+    if (user?.status !== 'APPROVED' || !user.email) return;
 
     deps.repo.logAudit({
       telegramId: ctx.from.id,
