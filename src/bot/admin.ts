@@ -74,7 +74,7 @@ export function makeAdminModule(opts: AdminModuleOpts): AdminModule {
 
       // Guard against stale buttons: only act if the user is still pending.
       // Earlier admin DMs may still have live keyboards after a newer decision.
-      if (!target || target.status !== 'PENDING_APPROVAL') {
+      if (target?.status !== 'PENDING_APPROVAL') {
         await opts.api.editMessageText(
           cq.message.chat.id,
           cq.message.message_id,
